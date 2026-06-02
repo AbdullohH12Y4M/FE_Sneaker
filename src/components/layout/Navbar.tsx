@@ -97,12 +97,12 @@ export default function Navbar() {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   aria-label="Menu pengguna"
                 >
-                  {session.user.image ? (
+                  {session.user?.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={session.user.image} alt={session.user.name ?? ''} className={styles.avatar} />
+                    <img src={session.user?.image} alt={session.user?.name ?? ''} className={styles.avatar} />
                   ) : (
                     <div className={styles.avatarFallback}>
-                      {(session.user.name ?? 'U')[0].toUpperCase()}
+                      {(session.user?.name ?? 'U')[0].toUpperCase()}
                     </div>
                   )}
                 </button>
@@ -116,14 +116,14 @@ export default function Navbar() {
                       transition={{ duration: 0.15 }}
                     >
                       <div className={styles.dropdownHeader}>
-                        <p className={styles.dropdownName}>{session.user.name}</p>
-                        <p className={styles.dropdownEmail}>{session.user.email}</p>
+                        <p className={styles.dropdownName}>{session.user?.name}</p>
+                        <p className={styles.dropdownEmail}>{session.user?.email}</p>
                       </div>
                       <hr className="divider" />
                       <Link href="/orders" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
                         <Package size={16} /> Pesanan Saya
                       </Link>
-                      {session.user.role === 'ADMIN' && (
+                      {session.user?.role === 'ADMIN' && (
                         <Link href="/admin" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
                           <Settings size={16} /> Dashboard Admin
                         </Link>
