@@ -7,7 +7,6 @@ import ProductCard from '@/components/shop/ProductCard';
 import FilterSidebar from '@/components/shop/FilterSidebar';
 import { useShopStore } from '@/store/shop';
 import styles from './page.module.css';
-
 export default function HomePage() {
   const products = useShopStore((state) => state.products);
   const params = useSearchParams();

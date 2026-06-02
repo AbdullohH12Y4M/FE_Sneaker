@@ -65,8 +65,14 @@ export default function Footer() {
               </li>
               <li>
                 <span className={styles.contactIcon}>💬</span>
-                <a href="https://wa.me/6281234567890" className={styles.link}>
-                  WhatsApp: 0812-3456-7890
+                <a href="https://wa.me/628818846197" className={styles.link}>
+                  WhatsApp: 0881-8846-197
+                </a>
+              </li>
+              <li>
+                <span className={styles.contactIcon}>📞</span>
+                <a href="https://wa.me/6289696875146" className={styles.link}>
+                  Althaf: 62 896-9687-5146
                 </a>
               </li>
               <li>
