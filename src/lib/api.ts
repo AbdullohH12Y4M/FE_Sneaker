@@ -45,7 +45,7 @@ export default api;
 export const productsApi = {
   // Existing (backend: /products)
   getAll: (params?: Record<string, unknown>) =>
-    api.get('/products', { params }),
+    api.get('/products/all', { params }),
 
   // Documentation public endpoint (backend: /all)
   // Mengambil semua produk dan kategori aktif tanpa filter.
