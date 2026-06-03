@@ -50,20 +50,20 @@ export default function ProductDetailPage() {
 
 
   const availableColors = useMemo(() => {
-    return Array.from(new Set(product.skus.filter((sku) => sku.stock > 0).map((sku) => sku.color)));
+    return Array.from(new Set<string>((product.skus || []).filter((sku: any) => sku.stock > 0).map((sku: any) => sku.color as string)));
   }, [product]);
 
   const availableSizes = useMemo(() => {
     if (!selectedColor) return [];
-    return product.skus
-      .filter((sku) => sku.color === selectedColor && sku.stock > 0)
-      .map((sku) => sku.size)
-      .sort((a, b) => a - b);
+    return (product.skus || [])
+      .filter((sku: any) => sku.color === selectedColor && sku.stock > 0)
+      .map((sku: any) => sku.size)
+      .sort((a: any, b: any) => a - b);
   }, [product, selectedColor]);
 
   const selectedSku = useMemo(() => {
     if (!selectedColor || selectedSize === null) return null;
-    return product.skus.find((sku) => sku.color === selectedColor && sku.size === selectedSize) ?? null;
+    return (product.skus || []).find((sku: any) => sku.color === selectedColor && sku.size === selectedSize) ?? null;
   }, [product, selectedColor, selectedSize]);
 
   const fallbackImage = 'https://placehold.co/600x600/1a1a24/f97316?text=SneakerLocal';
@@ -135,7 +135,7 @@ export default function ProductDetailPage() {
           </div>
           {product.images && product.images.length > 1 && (
             <div className={styles.galleryRow}>
-              {product.images.map((img, idx) => (
+              {(product.images as string[]).map((img: string, idx: number) => (
                 <img
                   key={idx}
                   src={img}
@@ -170,7 +170,7 @@ export default function ProductDetailPage() {
               <div className={styles.colorRow}>
                 {availableColors.length ? (
                   availableColors.map((color) => {
-                    const sku = product.skus.find((item) => item.color === color);
+                    const sku = (product.skus || []).find((item: any) => item.color === color);
                     return (
                       <button
                         key={color}
@@ -197,7 +197,7 @@ export default function ProductDetailPage() {
               <p className={styles.variantLabel}>Ukuran</p>
               <div className={styles.sizeRow}>
                 {availableSizes.length ? (
-                  availableSizes.map((size) => (
+                  (availableSizes as number[]).map((size: number) => (
                     <button
                       key={size}
                       type="button"
