@@ -1,37 +1,51 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProductCard from '@/components/shop/ProductCard';
 import FilterSidebar from '@/components/shop/FilterSidebar';
 import { useShopStore } from '@/store/shop';
 import styles from './page.module.css';
+
 export default function HomePage() {
   const router = useRouter();
-  const products = useShopStore((state) => state.products);
   const params = useSearchParams();
-  const [searchInput, setSearchInput] = useState(params.get('search') ?? '');
+
+  // 1. Ambil state terpusat, status loading, error, dan action fetch dari Zustand Store
+  const { products, isLoading, error, fetchProducts } = useShopStore();
+
+  // Ambil semua parameter filter aktif dari URL browser
   const category = params.get('category') ?? '';
   const color = params.get('color') ?? '';
-  const size = Number(params.get('size') ?? '0');
-  const minPrice = Number(params.get('minPrice') ?? '0');
-  const maxPrice = Number(params.get('maxPrice') ?? '0');
-  const search = params.get('search')?.toLowerCase() ?? '';
+  const size = params.get('size') ?? '';
+  const minPrice = params.get('minPrice') ?? '';
+  const maxPrice = params.get('maxPrice') ?? '';
+  const search = params.get('search') ?? '';
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const availableSkus = product.skus.filter((sku) => sku.stock > 0);
-      if (!availableSkus.length) return false;
-      if (category && product.category !== category) return false;
-      if (search && ![product.name, product.description].some((field) => field.toLowerCase().includes(search))) return false;
-      if (color && !availableSkus.some((sku) => sku.color.toLowerCase() === color.toLowerCase())) return false;
-      if (size && !availableSkus.some((sku) => sku.size === size)) return false;
-      if (minPrice && !availableSkus.some((sku) => (sku.price ?? product.basePrice) >= minPrice)) return false;
-      if (maxPrice && maxPrice > 0 && !availableSkus.some((sku) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
-      return true;
-    });
-  }, [products, category, color, size, minPrice, maxPrice, search]);
+  // State lokal untuk kolom pencarian di bagian Hero
+  const [searchInput, setSearchInput] = useState(search);
+
+  // Sinkronisasi input form jika parameter search di URL berubah dari luar
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  // 2. TRIGGER FETCH BACKEND REAL-TIME:
+  // Setiap kali filter di URL berubah (di-klik oleh user di sidebar),
+  // useEffect ini otomatis mendeteksi perubahan lalu menembak API backend via Zustand Action.
+  useEffect(() => {
+    const filters = {
+      category,
+      color,
+      size: size ? Number(size) : undefined,
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      search,
+    };
+
+    fetchProducts(filters);
+  }, [category, color, size, minPrice, maxPrice, search, fetchProducts]);
 
   return (
     <div className={styles.heroPage}>
@@ -90,7 +104,7 @@ export default function HomePage() {
             <h2 className={styles.sectionTitle}>Temukan sepatu sesuai kantong mahasiswa</h2>
           </div>
           <p className={styles.sectionMeta}>
-            Menampilkan <strong>{filteredProducts.length}</strong> produk dengan stok tersedia.
+            Menampilkan <strong>{isLoading ? '...' : products.length}</strong> produk dengan stok tersedia.
           </p>
         </div>
 
@@ -99,8 +113,17 @@ export default function HomePage() {
             <FilterSidebar />
           </div>
           <div className={styles.productGrid}>
-            {filteredProducts.length ? (
-              filteredProducts.map((product, index) => (
+            {/* 3. CONDITION RENDERING: Menangani UI secara dinamis saat loading, error, atau kosong */}
+            {isLoading ? (
+              <div className={styles.emptyState}>
+                <p className="text-muted">Sedang mengambil produk langsung dari server...</p>
+              </div>
+            ) : error ? (
+              <div className={styles.emptyState}>
+                <p className="text-danger">{error}</p>
+              </div>
+            ) : products.length ? (
+              products.map((product, index) => (
                 <ProductCard key={product.id} product={product} index={index} />
               ))
             ) : (
