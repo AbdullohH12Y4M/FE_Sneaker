@@ -43,8 +43,14 @@ export default api;
 
 // Products
 export const productsApi = {
+  // Existing (backend: /products)
   getAll: (params?: Record<string, unknown>) =>
     api.get('/products', { params }),
+
+  // Documentation public endpoint (backend: /all)
+  // Mengambil semua produk dan kategori aktif tanpa filter.
+  getAllPublic: () => api.get('/all'),
+
   getBySlug: (slug: string) =>
     api.get(`/products/${slug}`),
   // Disesuaikan ke JSON body sesuai spesifikasi backend (termasuk penentuan type 'PRODUCT'/'SKU')

@@ -31,26 +31,64 @@ export const useShopStore = create<ShopState>()(
       fetchProducts: async (filters) => {
         set({ isLoading: true, error: null });
         try {
-          const apiParams: Record<string, any> = { limit: 100 };
-          
-          if (filters?.search) apiParams.q = filters.search;
-          if (filters?.category) apiParams.categorySlug = filters.category.toLowerCase();
-          if (filters?.color) apiParams.color = filters.color;
-          if (filters?.size) apiParams.size = filters.size;
-          if (filters?.minPrice) apiParams.minPrice = filters.minPrice;
-          if (filters?.maxPrice) apiParams.maxPrice = filters.maxPrice;
+          const hasAnyFilter =
+            !!filters?.search ||
+            !!filters?.category ||
+            !!filters?.color ||
+            !!filters?.size ||
+            !!filters?.minPrice ||
+            !!filters?.maxPrice;
 
-          const response = await productsApi.getAll(apiParams);
-          const items = response.data?.items || response.data || [];
-          
+          // Default (tanpa filter) sesuai dokumentasi: GET /all
+          const response = hasAnyFilter
+            ? await productsApi.getAll({
+                limit: 100,
+                ...(filters?.search ? { q: filters.search } : {}),
+                ...(filters?.category ? { categorySlug: filters.category.toLowerCase() } : {}),
+                ...(filters?.color ? { color: filters.color } : {}),
+                ...(filters?.size ? { size: filters.size } : {}),
+                ...(filters?.minPrice ? { minPrice: filters.minPrice } : {}),
+                ...(filters?.maxPrice ? { maxPrice: filters.maxPrice } : {}),
+              })
+            : await productsApi.getAllPublic();
+
+          const data = response.data;
+
+          // Support 2 kemungkinan shape respons:
+          // 1) { products: [], categories: [] } (GET /all)
+          // 2) { items: [] } atau array langsung (GET /products lama)
+          const items =
+            data?.products ??
+            data?.items ??
+            (Array.isArray(data) ? data : []) ??
+            [];
+
           // Normalisasi Mismatch Struktur Data Backend -> Frontend
-          const normalizedProducts = items.map((product: any) => ({
-            ...product,
-            // Backend mengirim imageUrl (string tunggal), FE mengharapkan array images
-            images: product.imageUrl ? [product.imageUrl] : ['/placeholder-shoes.png'],
-            // Backend mengirim objek category atau categoryId, FE mengharapkan string label
-            category: product.category?.name || product.category || 'Uncategorized'
-          }));
+          const normalizedProducts = items.map((product: any) => {
+            const images =
+              product?.images?.length
+                ? product.images
+                : product?.imageUrl
+                  ? [product.imageUrl]
+                  : ['/placeholder-shoes.png'];
+
+            const categoryLabel =
+              product?.category?.name ??
+              product?.category?.slug ??
+              product?.category ??
+              product?.categoryName ??
+              product?.categorySlug ??
+              'Uncategorized';
+
+            const skus = product?.skus ?? product?.sku ?? [];
+
+            return {
+              ...product,
+              images,
+              category: categoryLabel,
+              skus,
+            };
+          });
 
           set({ products: normalizedProducts, isLoading: false });
         } catch (err: any) {
