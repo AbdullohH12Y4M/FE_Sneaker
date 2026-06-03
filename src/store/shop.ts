@@ -1,8 +1,26 @@
 import { create } from 'zustand';
-// Sesuaikan dengan API service atau axios instance yang kamu punya
-import { productsApi } from '@/lib/api'; 
+import { productsApi } from '@/lib/api';
 
-export const useShopStore = create((set) => ({
+interface FilterPayload {
+  category?: string;
+  color?: string;
+  size?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+}
+
+interface ShopState {
+  products: any[];
+  displayProducts: any[];
+  categories: string[];
+  isLoading: boolean;
+  error: string | null;
+  fetchProducts: () => Promise<void>;
+  filterProductsLocal: (filters: FilterPayload) => void;
+}
+
+export const useShopStore = create<ShopState>((set, get) => ({
   products: [],
   displayProducts: [],
   categories: [],
@@ -12,32 +30,60 @@ export const useShopStore = create((set) => ({
   fetchProducts: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Asumsi backend mengembalikan objek dengan key 'items' atau data langsung
-      const response = await productsApi.getAll(); 
+      const response = await productsApi.getAll();
       const items = response.data?.items || response.data || [];
 
-      // Memastikan normalisasi variabel konsisten (bukan typo normalized vs normalizedProducts)
-      let normalizedProducts = items.map((product: any) => ({
+      const normalizedProducts = items.map((product: any) => ({
         ...product,
-        // mapping tambahan jika struktur data backend perlu disesuaikan
+        images: product.imageUrl ? [product.imageUrl] : product.images || ['/placeholder-shoes.png'],
+        category: product.category?.name || product.category || 'Uncategorized',
       }));
 
-      // Ambil kategori unik secara dinamis jika backend tidak menyediakan endpoint category terpisah
-      const uniqueCategories = Array.from(
-        new Set(normalizedProducts.map((p: any) => p.category).filter(Boolean))
-      );
+      const uniqueCategories = Array.from(new Set(normalizedProducts.map((p: any) => p.category).filter(Boolean))) as string[];
 
       set({
         products: normalizedProducts,
-        displayProducts: normalizedProducts, // Default display items
+        displayProducts: normalizedProducts,
         categories: uniqueCategories,
-        isLoading: false
+        isLoading: false,
       });
     } catch (err: any) {
-      set({ 
-        error: err.message || 'Gagal memuat data produk', 
-        isLoading: false 
+      set({
+        error: err.message || 'Gagal memuat data produk',
+        isLoading: false,
       });
     }
   },
+
+  filterProductsLocal: (filters) => {
+    const { products } = get();
+    const { category, color, size, minPrice, maxPrice, search } = filters;
+
+    const filtered = products.filter((product) => {
+      const availableSkus = product.skus ? product.skus.filter((sku: any) => sku.stock > 0) : [];
+      if (!availableSkus.length) return false;
+
+      if (category && product.category?.toLowerCase() !== category.toLowerCase()) return false;
+
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const nameMatch = product.name?.toLowerCase().includes(searchLower);
+        const descMatch = product.description?.toLowerCase().includes(searchLower);
+        if (!nameMatch && !descMatch) return false;
+      }
+
+      if (color && !availableSkus.some((sku: any) => sku.color?.toLowerCase() === color.toLowerCase())) return false;
+
+      if (size && !availableSkus.some((sku: any) => sku.size === size)) return false;
+
+      if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
+
+      if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
+
+      return true;
+    });
+
+    set({ displayProducts: filtered });
+  },
 }));
+

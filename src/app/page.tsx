@@ -1,104 +1,111 @@
-import { create } from 'zustand';
-// Sesuaikan dengan API service atau axios instance yang kamu punya
-import { productsApi } from '@/lib/api'; 
+'use client';
 
-interface FilterPayload {
-  category?: string;
-  color?: string;
-  size?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  search?: string;
-}
+import { useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
-interface ShopState {
-  products: any[];
-  displayProducts: any[];
-  categories: string[];
-  isLoading: boolean;
-  error: string | null;
-  fetchProducts: () => Promise<void>;
-  filterProductsLocal: (filters: FilterPayload) => void;
-}
+import FilterSidebar from '@/components/shop/FilterSidebar';
+import ProductCard from '@/components/shop/ProductCard';
+import styles from './page.module.css';
 
-export const useShopStore = create<ShopState>((set, get) => ({
-  products: [],
-  displayProducts: [],
-  categories: [],
-  isLoading: false,
-  error: null,
+import { useShopStore } from '@/store/shop';
 
-  // 1. Ambil semua data produk dari backend secara utuh sekali saja
-  fetchProducts: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await productsApi.getAll(); 
-      const items = response.data?.items || response.data || [];
+export default function HomePage() {
+  const { products, fetchProducts } = useShopStore((state) => ({
+    products: state.products,
+    fetchProducts: state.fetchProducts,
+  }));
 
-      // Normalisasi struktur data backend agar kompatibel dengan komponen UI frontend
-      const normalizedProducts = items.map((product: any) => ({
-        ...product,
-        // Backend mengirim imageUrl (string tunggal), komponen UI biasanya membutuhkan array images
-        images: product.imageUrl ? [product.imageUrl] : (product.images || ['/placeholder-shoes.png']),
-        // Memastikan field category berupa string label yang konsisten
-        category: product.category?.name || product.category || 'Uncategorized'
-      }));
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
-      // Ambil kategori unik secara dinamis dari data produk yang masuk
-      const uniqueCategories = Array.from(
-        new Set(normalizedProducts.map((p: any) => p.category).filter(Boolean))
-      ) as string[];
+  const params = useSearchParams();
+  const category = params.get('category') ?? '';
+  const color = params.get('color') ?? '';
+  const size = Number(params.get('size') ?? '0');
+  const minPrice = Number(params.get('minPrice') ?? '0');
+  const maxPrice = Number(params.get('maxPrice') ?? '0');
+  const search = params.get('search')?.toLowerCase() ?? '';
 
-      set({
-        products: normalizedProducts,
-        displayProducts: normalizedProducts, // Default awal menampilkan semua produk
-        categories: uniqueCategories,
-        isLoading: false
-      });
-    } catch (err: any) {
-      set({ 
-        error: err.message || 'Gagal memuat data produk', 
-        isLoading: false 
-      });
-    }
-  },
-
-  // 2. Aksi Penyaringan Lokal (Client-side filtering) berdasarkan parameter URL
-  filterProductsLocal: (filters) => {
-    const { products } = get();
-    const { category, color, size, minPrice, maxPrice, search } = filters;
-
-    const filtered = products.filter((product) => {
-      // Pastikan produk memiliki varian SKU dengan stok yang tersedia
-      const availableSkus = product.skus ? product.skus.filter((sku: any) => sku.stock > 0) : [];
+  const filteredProducts = useMemo(() => {
+    return products.filter((product: any) => {
+      const availableSkus = (product.skus || []).filter((sku: any) => sku.stock > 0);
       if (!availableSkus.length) return false;
 
-      // Filter berdasarkan Kategori
-      if (category && product.category.toLowerCase() !== category.toLowerCase()) return false;
+      if (category && product.category !== category) return false;
 
-      // Filter berdasarkan Search Pencarian (Nama & Deskripsi)
       if (search) {
-        const searchLower = search.toLowerCase();
-        const nameMatch = product.name?.toLowerCase().includes(searchLower);
-        const descMatch = product.description?.toLowerCase().includes(searchLower);
-        if (!nameMatch && !descMatch) return false;
+        const name = String(product.name ?? '');
+        const desc = String(product.description ?? '');
+        if (![name, desc].some((field) => field.toLowerCase().includes(search))) return false;
       }
 
-      // Filter berdasarkan Warna Varian SKU
-      if (color && !availableSkus.some((sku: any) => sku.color?.toLowerCase() === color.toLowerCase())) return false;
-
-      // Filter berdasarkan Ukuran Varian SKU
+      if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
       if (size && !availableSkus.some((sku: any) => sku.size === size)) return false;
 
-      // Filter berdasarkan Rentang Harga Minimal
       if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
-
-      // Filter berdasarkan Rentang Harga Maksimal
       if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
 
       return true;
     });
+  }, [products, category, color, size, minPrice, maxPrice, search]);
 
-    set({ displayProducts: filtered });
-  }
-}));
+  return (
+    <div className={styles.heroPage}>
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <span className={styles.heroBadge}>SneakerLocal</span>
+          <h1 className={styles.heroTitle}>Sepatu lokal Malang, varian warna dan ukuran lengkap.</h1>
+          <p className={styles.heroText}>
+            Jelajahi katalog sepatu untuk mahasiswa: sneakers, kasual, formal, dan sandal dengan filter harga, ukuran, warna, dan stok tersedia.
+          </p>
+          <div className={styles.heroActions}>
+            <Link href="/cart" className="btn btn-primary btn-lg">
+              Buka Keranjang
+            </Link>
+            <Link href="/?category=SNEAKERS" className="btn btn-secondary btn-lg">
+              Lihat Sneakers
+            </Link>
+          </div>
+        </div>
+        <div className={styles.heroVisual}>
+          <div className={styles.heroCard}>
+            <h2>Flat ongkir Malang Raya</h2>
+            <p>Rp10.000 untuk Lowokwaru, Klojen, Blimbing, Sukun, Kedungkandang.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="container">
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.sectionLabel}>Katalog Produk</p>
+            <h2 className={styles.sectionTitle}>Temukan sepatu sesuai kantong mahasiswa</h2>
+          </div>
+          <p className={styles.sectionMeta}>
+            Menampilkan <strong>{filteredProducts.length}</strong> produk dengan stok tersedia.
+          </p>
+        </div>
+
+        <div className={styles.shopGrid}>
+          <div className={styles.sidebarWrapper}>
+            <FilterSidebar />
+          </div>
+          <div className={styles.productGrid}>
+            {filteredProducts.length ? (
+              filteredProducts.map((product: any, index: number) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))
+            ) : (
+              <div className={styles.emptyState}>
+                <p className="text-muted">Tidak ada produk sesuai filter. Coba ubah kategori, warna, atau ukuran.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
