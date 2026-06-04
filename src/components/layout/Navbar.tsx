@@ -202,9 +202,12 @@ export default function Navbar() {
                         <p className={styles.dropdownEmail}>{session.user?.email}</p>
                       </div>
                       <hr className="divider" />
-                      <Link href="/orders" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
-                        <FiArchive size={16} /> Pesanan Saya
-                      </Link>
+                       <Link href="/orders" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
+                         <FiArchive size={16} /> Pesanan Saya
+                       </Link>
+                       <Link href="/profile" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
+                         <FiUser size={16} /> Profil Saya
+                       </Link>
                       {session.user?.role === 'ADMIN' && (
                         <Link href="/admin" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
                           <FiSettings size={16} /> Dashboard Admin

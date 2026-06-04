@@ -1,17 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { productsApi } from '@/lib/api';
+import api from '@/lib/api';
 import FilterSidebar from '@/components/shop/FilterSidebar';
 import ProductCard from '@/components/shop/ProductCard';
+import { mockProducts } from '@/data/mockProducts';
 import styles from './page.module.css';
 
 export default function HomePage() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFromMock, setIsFromMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,8 +21,10 @@ export default function HomePage() {
     async function load() {
       setIsLoading(true);
       setError(null);
+      setIsFromMock(false);
+
       try {
-        const response = await productsApi.getAll();
+        const response = await api.get('/products', { params: { limit: 20 } });
         const productsFromApi = response.data?.products ?? response.data?.items ?? response.data?.itemsList ?? response.data ?? [];
         const categoriesFromApi = response.data?.categories ?? [];
 
@@ -29,6 +32,7 @@ export default function HomePage() {
           ...product,
           images: product.imageUrl ? [product.imageUrl] : product.images || ['/placeholder-shoes.png'],
           category: product.category?.name || product.category || 'Uncategorized',
+          _mock: false,
         }));
 
         const categoriesNormalized =
@@ -44,7 +48,18 @@ export default function HomePage() {
         setIsLoading(false);
       } catch (err: any) {
         if (!mounted) return;
-        setError(err?.message || 'Gagal memuat data produk');
+
+        const mockWithFilter = mockProducts.map((p) => ({
+          ...p,
+          images: p.imageUrl ? [p.imageUrl] : p.images || ['/placeholder-shoes.png'],
+          category: p.category?.name || p.category || 'Uncategorized',
+          _mock: true,
+        }));
+
+        setProducts(mockWithFilter);
+        setCategories(Array.from(new Set(mockWithFilter.map((p: any) => p.category).filter(Boolean))) as string[]);
+        setIsFromMock(true);
+        setError('Menampilkan data demo (backend belum terhubung)');
         setIsLoading(false);
       }
     }
@@ -55,37 +70,14 @@ export default function HomePage() {
     };
   }, []);
 
-
-  const params = useSearchParams();
-  const category = params.get('category') ?? '';
-  const color = params.get('color') ?? '';
-  const size = Number(params.get('size') ?? '0');
-  const minPrice = Number(params.get('minPrice') ?? '0');
-  const maxPrice = Number(params.get('maxPrice') ?? '0');
-  const search = params.get('search')?.toLowerCase() ?? '';
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((product: any) => {
+  const displayProducts = useMemo(() => {
+    if (isFromMock) return products;
+    const available = products.filter((product: any) => {
       const availableSkus = (product.skus || []).filter((sku: any) => sku.stock > 0);
-      if (!availableSkus.length) return false;
-
-      if (category && product.category !== category) return false;
-
-      if (search) {
-        const name = String(product.name ?? '');
-        const desc = String(product.description ?? '');
-        if (![name, desc].some((field) => field.toLowerCase().includes(search))) return false;
-      }
-
-      if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
-      if (size && !availableSkus.some((sku: any) => sku.size === size)) return false;
-
-      if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
-      if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
-
-      return true;
+      return availableSkus.length > 0;
     });
-  }, [products, category, color, size, minPrice, maxPrice, search]);
+    return available;
+  }, [products, isFromMock]);
 
   return (
     <div className={styles.heroPage}>
@@ -94,14 +86,16 @@ export default function HomePage() {
           <span className={styles.heroBadge}>SneakerLocal</span>
           <h1 className={styles.heroTitle}>Sepatu lokal Malang, varian warna dan ukuran lengkap.</h1>
           <p className={styles.heroText}>
-            Jelajahi katalog sepatu untuk mahasiswa: sneakers, kasual, formal, dan sandal dengan filter harga, ukuran, warna, dan stok tersedia.
+            {isFromMock
+              ? 'Menampilkan data demo. Setelah backend aktif, harga dan stok akan ter-update otomatis.'
+              : 'Jelajahi katalog sepatu untuk mahasiswa: sneakers, kasual, formal, dan sandal dengan filter harga, ukuran, warna, dan stok tersedia.'}
           </p>
           <div className={styles.heroActions}>
             <Link href="/cart" className="btn btn-primary btn-lg">
               Buka Keranjang
             </Link>
-            <Link href="/?category=SNEAKERS" className="btn btn-secondary btn-lg">
-              Lihat Sneakers
+            <Link href="/search" className="btn btn-secondary btn-lg">
+              Lihat Katalog
             </Link>
           </div>
         </div>
@@ -116,27 +110,47 @@ export default function HomePage() {
       <section className="container">
         <div className={styles.sectionHeader}>
           <div>
-            <p className={styles.sectionLabel}>Katalog Produk</p>
-            <h2 className={styles.sectionTitle}>Temukan sepatu sesuai kantong mahasiswa</h2>
+            <p className={styles.sectionLabel}>
+              {isFromMock ? 'Produk Demo' : 'Katalog Produk'}
+            </p>
+            <h2 className={styles.sectionTitle}>
+              {isFromMock ? 'Koleksi contoh untukPreview' : 'Temukan sepatu sesuai kantong mahasiswa'}
+            </h2>
           </div>
           <p className={styles.sectionMeta}>
-            Menampilkan <strong>{filteredProducts.length}</strong> produk dengan stok tersedia.
+            {isLoading
+              ? 'Memuat...'
+              : `Menampilkan ${displayProducts.length} produk dengan stok tersedia.`}
           </p>
         </div>
+
+        {isFromMock && (
+          <div className="card" style={{ padding: '12px 16px', marginBottom: '20px', borderLeft: '4px solid var(--color-warning)' }}>
+            <p className="text-muted" style={{ margin: 0 }}>
+              ⚠️ <strong>Mode Demo:</strong> Menampilkan data contoh. Setelah backend terhubung, data akan otomatis diperbarui dari server.
+            </p>
+          </div>
+        )}
+
+        {error && !isFromMock && (
+          <div className="card" style={{ padding: '12px 16px', marginBottom: '20px' }}>
+            <p className="form-error" style={{ margin: 0 }}>{error}</p>
+          </div>
+        )}
 
         <div className={styles.shopGrid}>
           <div className={styles.sidebarWrapper}>
             <FilterSidebar categories={categories} />
           </div>
           <div className={styles.productGrid}>
-            {filteredProducts.length ? (
-              filteredProducts.map((product: any, index: number) => (
-                <ProductCard key={product.id ?? product.slug ?? index} product={product} index={index} />
-              ))
-            ) : (
+            {displayProducts.length === 0 ? (
               <div className={styles.emptyState}>
                 <p className="text-muted">Tidak ada produk sesuai filter. Coba ubah kategori, warna, atau ukuran.</p>
               </div>
+            ) : (
+              displayProducts.map((product: any, index: number) => (
+                <ProductCard key={product.id ?? product.slug ?? index} product={product} index={index} />
+              ))
             )}
           </div>
         </div>
@@ -144,4 +158,3 @@ export default function HomePage() {
     </div>
   );
 }
-
