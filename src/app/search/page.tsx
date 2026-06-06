@@ -84,8 +84,8 @@ export default function SearchPage() {
             const desc = String(product.description ?? '').toLowerCase();
             if (![name, desc].some((field) => field.toLowerCase().includes(search))) return false;
           }
-          if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
-          if (size && !availableSkus.some((sku: any) => sku.size === size)) return false;
+if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
+           if (size && !availableSkus.some((sku: any) => sku.sizeEU === size)) return false;
           if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
           if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
 
@@ -120,8 +120,8 @@ export default function SearchPage() {
         if (![name, desc].some((field) => field.toLowerCase().includes(search))) return false;
       }
 
-      if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
-      if (size && !availableSkus.some((sku: any) => sku.size === size)) return false;
+if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
+           if (size && !availableSkus.some((sku: any) => sku.sizeEU === size)) return false;
       if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
       if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
 

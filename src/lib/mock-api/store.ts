@@ -1,7 +1,56 @@
 import { mockCategories, mockProductCatalog, type MockProductRecord } from '@/data/mockCatalog';
 import { mockUsers } from '@/data/mockUsers';
 
-const STORAGE_KEY = 'sneakerlocal-mock-api-v1';
+export const STORAGE_KEY = 'sneakerlocal-mock-state';
+
+export type MockBrandRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const mockBrands: MockBrandRecord[] = [
+  {
+    id: 'brand-nike',
+    name: 'Nike',
+    slug: 'nike',
+    logoUrl: null,
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'brand-adidas',
+    name: 'Adidas',
+    slug: 'adidas',
+    logoUrl: null,
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'brand-newbalance',
+    name: 'New Balance',
+    slug: 'new-balance',
+    logoUrl: null,
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'brand-puma',
+    name: 'Puma',
+    slug: 'puma',
+    logoUrl: null,
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  },
+];
 
 export type MockOrderRecord = {
   id: string;
@@ -34,6 +83,7 @@ export type MockOrderRecord = {
 export type MockState = {
   products: MockProductRecord[];
   categories: typeof mockCategories;
+  brands: MockBrandRecord[];
   orders: MockOrderRecord[];
   users: typeof mockUsers;
 };
@@ -46,6 +96,7 @@ function defaultState(): MockState {
   return {
     products: clone(mockProductCatalog),
     categories: clone(mockCategories),
+    brands: clone(mockBrands),
     orders: [],
     users: clone(mockUsers),
   };
@@ -57,14 +108,15 @@ export function loadMockState(): MockState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw) as MockState;
-    return {
-      ...defaultState(),
-      ...parsed,
-      products: parsed.products?.length ? parsed.products : clone(mockProductCatalog),
-      categories: parsed.categories?.length ? parsed.categories : clone(mockCategories),
-      orders: parsed.orders ?? [],
-      users: parsed.users?.length ? parsed.users : clone(mockUsers),
-    };
+  return {
+    ...defaultState(),
+    ...parsed,
+    products: parsed.products?.length ? parsed.products : clone(mockProductCatalog),
+    categories: parsed.categories?.length ? parsed.categories : clone(mockCategories),
+    brands: parsed.brands?.length ? parsed.brands : clone(mockBrands),
+    orders: parsed.orders ?? [],
+    users: parsed.users?.length ? parsed.users : clone(mockUsers),
+  };
   } catch {
     return defaultState();
   }

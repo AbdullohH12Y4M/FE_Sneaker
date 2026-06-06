@@ -53,12 +53,17 @@ export default function CheckoutPage() {
 
       const response = await ordersApi.checkout(checkoutData);
       const order = response.data;
+      const orderId = (order as { id?: string })?.id;
 
       clearCart();
       setSuccessMessage('Pesanan berhasil dibuat. Silakan lanjutkan ke pembayaran.');
       
       setTimeout(() => {
-        router.push(`/orders/${order.id}`);
+        if (orderId) {
+          router.push(`/orders/${orderId}`);
+        } else {
+          router.push('/orders');
+        }
       }, 2000);
     } catch (error: any) {
       setErrorMessage(extractErrorMessage(error));

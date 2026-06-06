@@ -36,6 +36,50 @@ export function truncate(text: string, maxLength: number): string {
   return `${text.slice(0, maxLength)}...`;
 }
 
+// NOTE: Some admin pages import normalizeProduct.
+// This keeps normalization logic centralized to avoid TS export errors.
+export function normalizeProduct(input: Record<string, unknown>, productId: string): Record<string, unknown> {
+  const raw = input ?? {};
+
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    slug: String(raw.slug ?? ''),
+    skuCode: String(raw.skuCode ?? ''),
+    description: String(raw.description ?? ''),
+    basePrice: Number(raw.basePrice ?? 0),
+    gender: raw.gender ?? 'UNISEX',
+    releaseYear: raw.releaseYear ? Number(raw.releaseYear) : undefined,
+    isActive: Boolean(raw.isActive ?? true),
+    categoryId: String(raw.categoryId ?? ''),
+    brandId: String(raw.brandId ?? ''),
+    category: raw.category,
+    brand: raw.brand,
+    images: Array.isArray(raw.images) ? (raw.images as string[]) : [],
+    skus: Array.isArray(raw.skus)
+      ? (raw.skus as Array<{ [key: string]: unknown }>).map((s) => ({
+          id: String((s as { id?: unknown }).id ?? ''),
+          productId: String((s as { productId?: unknown }).productId ?? productId),
+          color: String((s as { color?: unknown }).color ?? ''),
+          colorHex: String((s as { colorHex?: unknown }).colorHex ?? '#888888'),
+          sizeEU: Number((s as { sizeEU?: unknown }).sizeEU ?? 0),
+          sizeUS: (s as { sizeUS?: unknown }).sizeUS ? String((s as { sizeUS?: unknown }).sizeUS) : undefined,
+          sizeUK: (s as { sizeUK?: unknown }).sizeUK ? String((s as { sizeUK?: unknown }).sizeUK) : undefined,
+          sizeCM: (s as { sizeCM?: unknown }).sizeCM != null
+            ? Number((s as { sizeCM?: unknown }).sizeCM)
+            : undefined,
+          stock: Number((s as { stock?: unknown }).stock ?? 0),
+          price: (s as { price?: unknown }).price != null ? Number((s as { price?: unknown }).price) : undefined,
+        }))
+      : [],
+
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? ''),
+  };
+}
+
+
+
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Menunggu Pembayaran',
   WAITING_CONFIRMATION: 'Menunggu Verifikasi Admin',
@@ -68,17 +112,28 @@ export const MALANG_DISTRICTS = [
   { id: 'KEDUNGKANDANG', name: 'Kedungkandang' },
 ];
 
-export function extractErrorMessage(error: any): string {
+export function extractErrorMessage(error: unknown): string {
   if (!error) return 'Terjadi kesalahan. Coba lagi.';
-  
-  if (error.response?.data?.message) {
-    const msg = error.response.data.message;
-    if (Array.isArray(msg)) {
-      return msg.join(', ');
-    }
+
+  if (typeof error === 'string') return error;
+
+  const err = error as {
+    response?: { data?: { message?: string | string[] } };
+    request?: unknown;
+    message?: string;
+  };
+
+  if (err.response?.data?.message) {
+    const msg = err.response.data.message;
+    if (Array.isArray(msg)) return msg.join(', ');
     return msg;
   }
-  
-  return error.message || 'Terjadi kesalahan. Coba lagi.';
+
+  // Network error — no response from server
+  if (err.request && !err.response) {
+    return 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
+  }
+
+  return err.message || 'Terjadi kesalahan. Coba lagi.';
 }
 

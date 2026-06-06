@@ -17,8 +17,8 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const [wishlisted, setWishlisted] = useState(false);
   const [imgError, setImgError] = useState(false);
 
-  const uniqueColors = [...new Set(product.skus.map((s) => s.color))];
-  const totalStock = product.skus.reduce((sum, s) => sum + s.stock, 0);
+  const uniqueColors = [...new Set((product.skus ?? []).map((s) => s.color))];
+  const totalStock = (product.skus ?? []).reduce((sum, s) => sum + s.stock, 0);
   const isOutOfStock = totalStock === 0;
 
   const displayImage =
@@ -72,7 +72,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
         {/* Color swatches */}
         <div className={styles.swatches}>
           {uniqueColors.slice(0, 5).map((color) => {
-            const sku = product.skus.find((s) => s.color === color);
+            const sku = (product.skus ?? []).find((s) => s.color === color);
             return (
               <span
                 key={color}

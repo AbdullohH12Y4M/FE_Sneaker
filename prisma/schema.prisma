@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products  Product[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  categoryId  String
+  brandId     String?
+  name        String
+  slug        String   @unique
+  description String   @default("")
+  basePrice   Int
+  imageUrl    String?
+  skuCode     String?   @unique
+  gender      String?
+  releaseYear Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category    Category     @relation(fields: [categoryId], references: [id])
+  brand       Brand?       @relation(fields: [brandId], references: [id])
+  skus        ProductSKU[]
+  images      ProductImage[]
+}
+
+model ProductSKU {
+  id        String  @id @default(cuid())
+  productId String
+  color     String
+  colorHex  String  @default("#888888")
+  sizeEU    Float
+  sizeUS    String?
+  sizeUK    String?
+  sizeCM    Float?
+  price     Int?
+
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory Inventory?
+  orderItems OrderItem[]
+
+  @@unique([productId, color, sizeEU])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  isPrimary Boolean @default(false)
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Inventory {
+  id        String   @id @default(cuid())
+  skuId     String   @unique
+  stock     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  sku ProductSKU @relation(fields: [skuId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  userId          String
+  status          OrderStatus   @default(PENDING)
+  shippingType    ShippingType
+  shippingAddress  String?
+  shippingDistrict String?
+  shippingFee      Int           @default(0)
+  shippingCost     Int           @default(0)
+  subtotal         Int
+  totalPrice       Int
+  paymentMethod    PaymentMethod
+  paymentProofUrl  String?
+  paymentExpiresAt DateTime?
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+}
+
+model OrderItem {
+  id              String @id @default(cuid())
+  orderId         String
+  skuId           String
+  quantity        Int
+  priceAtPurchase Int
+
+  order Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sku   ProductSKU @relation(fields: [skuId], references: [id])
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  WAITING_CONFIRMATION
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ShippingType {
+  DELIVERY
+  PICKUP
+}
+
+enum PaymentMethod {
+  MANUAL_TRANSFER
+  MIDTRANS
+  COD
+}

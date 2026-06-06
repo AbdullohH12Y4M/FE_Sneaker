@@ -108,9 +108,9 @@ export default function CategoryDetailPage() {
       ) : (
         <div className={styles.categoryProductsGrid}>
           {products.map((product, index) => (
-            <ProductCard key={product.id ?? product.slug ?? index} product={product} index={index} />
+            <ProductCard key={product.id ?? product.slug ?? index} product={product as any} index={index} />
           ))}
-        </div>
+        </div> 
       )}
     </div>
   );

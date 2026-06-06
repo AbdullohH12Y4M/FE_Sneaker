@@ -1,17 +1,41 @@
-import type { Order, Product } from '@/types';
+import type { Order, Product, ProductSKU } from '@/types';
 import { ordersApi, productsApi } from './api';
 import { isMockApiEnabled } from './mock-api/config';
 
-/** Ambil array dari berbagai bentuk respons paginasi BE. */
+// ─── List parsing ─────────────────────────────────────────────────────────────
+
 export function parseListPayload<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
     if (Array.isArray(obj.items)) return obj.items as T[];
     if (Array.isArray(obj.products)) return obj.products as T[];
+    if (Array.isArray(obj.data)) return obj.data as T[];
   }
   return [];
 }
+
+// ─── SKU normalizer ───────────────────────────────────────────────────────────
+
+export function normalizeSku(sku: Record<string, unknown>): ProductSKU {
+  return {
+    id: String(sku.id ?? ''),
+    productId: String(sku.productId ?? ''),
+    color: String(sku.color ?? ''),
+    colorHex: String(sku.colorHex ?? '#888888'),
+    sizeEU: Number(sku.sizeEU ?? sku.size ?? 0), // fallback to old `size` for compat
+    sizeUS: sku.sizeUS ? String(sku.sizeUS) : undefined,
+    sizeUK: sku.sizeUK ? String(sku.sizeUK) : undefined,
+    sizeCM: sku.sizeCM != null ? Number(sku.sizeCM) : undefined,
+    stock:
+      typeof sku.stock === 'number'
+        ? sku.stock
+        : ((sku.inventory as { stock?: number } | undefined)?.stock ?? 0),
+    price: sku.price != null ? Number(sku.price) : undefined,
+  };
+}
+
+// ─── Product normalizer ───────────────────────────────────────────────────────
 
 export function normalizeProductCategory(category: unknown): string {
   if (typeof category === 'string') return category;
@@ -22,66 +46,111 @@ export function normalizeProductCategory(category: unknown): string {
   return 'Uncategorized';
 }
 
+export function normalizeProductBrand(brand: unknown): string {
+  if (typeof brand === 'string') return brand;
+  if (brand && typeof brand === 'object') {
+    const b = brand as { name?: string; slug?: string };
+    return b.name ?? b.slug ?? 'Unknown Brand';
+  }
+  return 'Unknown Brand';
+}
+
 export function normalizeProduct(product: Record<string, unknown>): Product {
-  const rawSkus = (product.skus as Record<string, unknown>[]) || [];
-  const skus = rawSkus.map((sku) => ({
-    ...sku,
-    stock:
-      (sku.stock as number) ??
-      ((sku.inventory as { stock?: number } | undefined)?.stock ?? 0),
-  })) as Product['skus'];
+  const rawSkus = Array.isArray(product.skus)
+    ? (product.skus as Record<string, unknown>[])
+    : [];
+  const skus = rawSkus.map(normalizeSku);
 
-  const images = Array.isArray(product.images) && product.images.length
-    ? (product.images as string[])
-    : product.imageUrl
-      ? [String(product.imageUrl)]
-      : ['/placeholder-shoes.png'];
-
-  const category = product.category as { id?: string } | string | undefined;
+  // Images: API returns string[] already (normalized in routes).
+  // But handle both string[] and ProductImage[] objects for safety.
+  let images: string[] = ['/placeholder-shoes.png'];
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    const first = product.images[0];
+    if (typeof first === 'string') {
+      images = product.images as string[];
+    } else if (typeof first === 'object' && first !== null) {
+      images = (product.images as { url: string }[]).map((i) => i.url);
+    }
+  }
 
   return {
     ...(product as unknown as Product),
-    category: normalizeProductCategory(category),
+    id: String(product.id ?? ''),
+    name: String(product.name ?? ''),
+    slug: String(product.slug ?? ''),
+    skuCode: String(product.skuCode ?? ''),
+    description: String(product.description ?? ''),
+    basePrice: Number(product.basePrice ?? 0),
+    gender: (product.gender as Product['gender']) ?? 'UNISEX',
+    releaseYear: product.releaseYear ? Number(product.releaseYear) : undefined,
+    isActive: Boolean(product.isActive ?? true),
+    categoryId: String(product.categoryId ?? ''),
+    brandId: String(product.brandId ?? ''),
+    category: normalizeProductCategory(product.category),
+    brand: normalizeProductBrand(product.brand),
     images,
     skus,
   };
 }
 
+// ─── Order normalizer ─────────────────────────────────────────────────────────
+
 export function normalizeOrderItem(item: Record<string, unknown>) {
-  const unitPrice = (item.priceAtPurchase as number) ?? (item.price as number) ?? 0;
+  const unitPrice =
+    typeof item.priceAtPurchase === 'number'
+      ? item.priceAtPurchase
+      : typeof item.price === 'number'
+        ? item.price
+        : 0;
   const sku = item.sku as Record<string, unknown> | undefined;
 
   return {
     ...item,
+    id: String(item.id ?? ''),
+    skuId: String(item.skuId ?? ''),
+    quantity: Number(item.quantity ?? 0),
     priceAtPurchase: unitPrice,
     sku: sku
       ? {
-          ...sku,
+          ...normalizeSku(sku),
           product: sku.product
             ? normalizeProduct(sku.product as Record<string, unknown>)
-            : sku.product,
+            : undefined,
         }
-      : sku,
+      : undefined,
   };
 }
 
 export function normalizeOrder(order: Record<string, unknown>): Order {
-  const items = ((order.items as Record<string, unknown>[]) || []).map((item) =>
-    normalizeOrderItem(item)
-  );
-
-  const shippingFee =
-    (order.shippingFee as number) ?? (order.shippingCost as number) ?? 0;
+  const rawItems = Array.isArray(order.items)
+    ? (order.items as Record<string, unknown>[])
+    : [];
 
   return {
     ...(order as unknown as Order),
-    items: items as Order['items'],
-    totalPrice: (order.totalPrice as number) ?? (order.total as number) ?? 0,
-    shippingCost: shippingFee,
+    items: rawItems.map((item) => normalizeOrderItem(item)) as Order['items'],
+    subtotal:
+      typeof order.subtotal === 'number'
+        ? order.subtotal
+        : 0,
+    totalPrice:
+      typeof order.totalPrice === 'number'
+        ? order.totalPrice
+        : typeof order.total === 'number'
+          ? order.total
+          : 0,
+    shippingFee:
+      typeof order.shippingFee === 'number'
+        ? order.shippingFee
+        : typeof order.shippingCost === 'number'
+          ? order.shippingCost
+          : 0,
     shippingDistrict:
-      (order.shippingDistrict as string) ?? (order.district as string),
-    paymentDeadline:
-      (order.paymentDeadline as string) ?? (order.paymentExpiresAt as string),
+      (order.shippingDistrict as string | undefined) ??
+      (order.district as string | undefined),
+    paymentExpiresAt:
+      (order.paymentExpiresAt as string | undefined) ??
+      (order.paymentDeadline as string | undefined),
   };
 }
 
@@ -93,7 +162,8 @@ export function parseProductsList(data: unknown): Product[] {
   return parseListPayload<Record<string, unknown>>(data).map(normalizeProduct);
 }
 
-/** Unduh struk PDF ke perangkat pengguna. */
+// ─── Receipt download ─────────────────────────────────────────────────────────
+
 export async function downloadOrderReceipt(orderId: string): Promise<void> {
   const res = await ordersApi.downloadReceipt(orderId);
   const blob =
@@ -103,35 +173,20 @@ export async function downloadOrderReceipt(orderId: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `struk-${orderId}.pdf`;
+  anchor.download = `struk-${orderId}.txt`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
 }
 
+// ─── Admin helper: products with SKUs ────────────────────────────────────────
+
 /**
- * Muat produk admin beserta SKU (detail per slug).
- * GET /products tidak menyertakan SKU; ini solusi FE tanpa ubah BE.
+ * Load all products with SKUs for admin pages.
+ * Uses /api/products/all which includes skus + brand + images in one request.
  */
 export async function fetchAdminProductsWithSkus(): Promise<Product[]> {
-  const listRes = await productsApi.getAll({ limit: 100 });
-  const base = parseProductsList(listRes.data);
-
-  if (isMockApiEnabled()) {
-    return base;
-  }
-
-  return Promise.all(
-    base.map(async (product) => {
-      if (product.skus?.length) return product;
-      if (!product.slug) return product;
-      try {
-        const detailRes = await productsApi.getBySlug(product.slug);
-        return normalizeProduct(detailRes.data as Record<string, unknown>);
-      } catch {
-        return product;
-      }
-    })
-  );
+  const res = await productsApi.listCatalog();
+  return parseProductsList(res.data);
 }

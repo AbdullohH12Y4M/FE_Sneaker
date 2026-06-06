@@ -3,38 +3,44 @@ export type UserRole = 'CUSTOMER' | 'ADMIN';
 
 export interface User {
   id: string;
-  name: string;
+  name?: string;
   email: string;
   image?: string;
   role: UserRole;
   createdAt: string;
 }
 
-export interface Category {
+// ─── Brand ──────────────────────────────────────────────────────────────────
+export interface Brand {
   id: string;
   name: string;
   slug: string;
+  logoUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Category ───────────────────────────────────────────────────────────────
+export interface Category {
   description?: string;
+  id: string;
+  name: string;
+  slug: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 // ─── Product & SKU ──────────────────────────────────────────────────────────
-export type ProductCategory = 'SNEAKERS' | 'CASUAL' | 'FORMAL' | 'SANDAL' | 'BOOTS';
+export type GenderType = 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS';
 
-export interface Product {
+export interface ProductImage {
   id: string;
-  name: string;
-  slug: string;
-  description: string;
-  basePrice: number;
-  discount?: number;
-  category: ProductCategory | string;
-  images: string[];
-  skus: ProductSKU[];
-  createdAt?: string;
-  updatedAt?: string;
+  productId: string;
+  url: string;
+  isPrimary: boolean;
+  createdAt: string;
 }
 
 export interface ProductSKU {
@@ -42,15 +48,44 @@ export interface ProductSKU {
   productId: string;
   color: string;
   colorHex: string;
-  size: number;
+  /** EU size — patokan utama */
+  sizeEU: number;
+  sizeUS?: string;
+  sizeUK?: string;
+  sizeCM?: number;
   stock: number;
-  price?: number; // override base price if needed
+  price?: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  skuCode: string;
+  description: string;
+  basePrice: number;
+  discount?: number;
+  gender: GenderType;
+  releaseYear?: number;
+  isActive: boolean;
+  categoryId: string;
+  brandId: string;
+  /** Dikirim sebagai objek dari API */
+  category: { id: string; name: string; slug: string } | string;
+  brand: { id: string; name: string; slug: string } | string;
+  /** Array URL gambar (dinormalisasi dari ProductImage[]) */
+  images: string[];
+  skus: ProductSKU[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ProductFilters {
-  category?: ProductCategory;
+  category?: string;
+  brand?: string;
   color?: string;
-  size?: number;
+  sizeEU?: number;
+  gender?: GenderType;
   minPrice?: number;
   maxPrice?: number;
   search?: string;
@@ -67,7 +102,7 @@ export interface CartItem {
   image: string;
   color: string;
   colorHex: string;
-  size: number;
+  sizeEU: number;
   price: number;
   quantity: number;
   maxStock: number;
@@ -80,13 +115,19 @@ export interface Cart {
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────
-export type OrderStatus = 'PENDING' | 'WAITING_CONFIRMATION' | 'PAID' | 'SHIPPED' | 'CANCELLED';
+export type OrderStatus =
+  | 'PENDING'
+  | 'WAITING_CONFIRMATION'
+  | 'PAID'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED';
 export type ShippingType = 'DELIVERY' | 'PICKUP';
-export type PaymentMethod = 'MANUAL_TRANSFER' | 'TRANSFER' | 'MIDTRANS' | 'COD';
+export type PaymentMethod = 'MANUAL_TRANSFER' | 'MIDTRANS' | 'COD';
 
 export interface ShippingZone {
   id: string;
-  district: string;  // Kecamatan di Malang
+  district: string;
   price: number;
 }
 
@@ -100,19 +141,21 @@ export interface OrderItem {
 }
 
 export interface Order {
+  shippingCost: number;
   id: string;
   userId: string;
   user?: User;
   status: OrderStatus;
   items: OrderItem[];
+  subtotal: number;
   totalPrice: number;
   shippingType: ShippingType;
   shippingAddress?: string;
   shippingDistrict?: string;
-  shippingCost: number;
+  shippingFee: number;
   paymentMethod: PaymentMethod;
   paymentProofUrl?: string;
-  paymentDeadline?: string;
+  paymentExpiresAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -126,7 +169,7 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
-  data: T[];
+  items: T[];
   total: number;
   page: number;
   limit: number;

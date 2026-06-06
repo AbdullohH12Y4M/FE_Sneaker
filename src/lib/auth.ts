@@ -2,7 +2,8 @@ import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import type { NextAuthConfig } from 'next-auth';
-import { authApi } from './api';
+import prisma from './prisma';
+import { verifyPassword } from './password';
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -20,37 +21,24 @@ export const authConfig: NextAuthConfig = {
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
-          const res = await authApi.login({
-            email: credentials.email,
-            password: credentials.password,
+          const user = await prisma.user.findUnique({
+            where: { email: String(credentials.email) },
           });
 
-          const data = res.data;
-          // Memastikan data sesuai dengan response asli backend: data.access_token & data.user
-          if (data?.access_token && data?.user) {
-            return {
-              id: data.user.id,
-              // Fallback karena backend tidak mengirimkan field 'name'
-              name: data.user.name || data.user.email.split('@')[0], 
-              email: data.user.email,
-              role: data.user.role || 'CUSTOMER',
-              accessToken: data.access_token,
-            };
-          }
-          return null;
-        } catch (error: any) {
-          // === INSTRUMEN PENGUJIAN BARU ===
-          console.error('❌ [Auth-Authorize] Terjadi kegagalan saat hit API login backend:');
-          if (error.response) {
-            // Backend merespons tetapi dengan status kode di luar 2xx (e.g., 400, 401)
-            console.error('Status Code dari BE:', error.response.status);
-            console.error('Pesan Eror dari BE:', error.response.data);
-          } else if (error.request) {
-            // Request dikirim tetapi tidak ada respons sama sekali (e.g., Network timeout/Railway cold start)
-            console.error('Tidak ada respons dari backend. Periksa koneksi jaringan atau apakah server Railway mati/sleep.');
-          } else {
-            console.error('Eror konfigurasi request:', error.message);
-          }
+          if (!user) return null;
+
+          const valid = await verifyPassword(String(credentials.password), user.password);
+          if (!valid) return null;
+
+          return {
+            id: user.id,
+            name: user.name ?? user.email.split('@')[0],
+            email: user.email,
+            role: user.role,
+            accessToken: 'session',
+          };
+        } catch (error) {
+          console.error('❌ [Auth-Authorize] Login error:', error);
           return null;
         }
       },

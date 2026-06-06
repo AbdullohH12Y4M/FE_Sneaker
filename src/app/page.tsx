@@ -34,7 +34,7 @@ function HomeContent() {
       setIsFromMock(false);
 
       try {
-        const response = await productsApi.getAll({ limit: 20 });
+        const response = await productsApi.listCatalog();
         const categoriesFromApi =
           response.data && typeof response.data === 'object' && !Array.isArray(response.data)
             ? (response.data as { categories?: unknown[] }).categories ?? []
@@ -97,8 +97,8 @@ function HomeContent() {
         if (![name, desc].some((field) => field.includes(search))) return false;
       }
 
-      if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
-      if (size && !availableSkus.some((sku: any) => sku.size === size)) return false;
+if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
+       if (size && !availableSkus.some((sku: any) => sku.sizeEU === size)) return false;
       if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
       if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
 

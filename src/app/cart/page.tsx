@@ -69,7 +69,7 @@ export default function CartPage() {
                       <Link href={`/products/${item.productSlug}`} className={styles.productName}>
                         {item.productName}
                       </Link>
-                      <p className="text-muted">{item.color} • EU {item.size}</p>
+                      <p className="text-muted">{item.color} • EU {item.sizeEU}</p>
                       <button className="btn btn-ghost btn-sm" onClick={() => removeItem(item.skuId)}>
                         Hapus
                       </button>

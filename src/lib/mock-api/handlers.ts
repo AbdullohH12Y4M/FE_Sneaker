@@ -81,7 +81,7 @@ function filterProducts(products: MockProductRecord[], params?: Record<string, u
     const skus = p.skus.filter((s) => s.stock > 0);
     if (!skus.length) return false;
     if (color && !skus.some((s) => s.color.toLowerCase() === color.toLowerCase())) return false;
-    if (size && !skus.some((s) => s.size === size)) return false;
+    if (size && !skus.some((s) => s.sizeEU === size)) return false;
     if (minPrice && !skus.some((s) => (s.price ?? p.basePrice) >= minPrice)) return false;
     if (maxPrice && maxPrice > 0 && !skus.some((s) => (s.price ?? p.basePrice) <= maxPrice)) return false;
     return true;
@@ -105,7 +105,7 @@ function buildOrderItems(items: Array<{ skuId: string; quantity: number }>) {
     if (!sku) throw new Error(`SKU ${line.skuId} not found`);
     const product = state.products.find((p) => p.id === sku.productId);
     if (!product?.isActive) throw new Error('Product not active');
-    if (sku.stock < line.quantity) throw new Error(`Stok tidak cukup untuk ${sku.color} EU ${sku.size}`);
+    if (sku.stock < line.quantity) throw new Error(`Stok tidak cukup untuk ${sku.color} EU ${sku.sizeEU}`);
 
     const price = sku.price ?? product.basePrice;
     subtotal += price * line.quantity;
@@ -126,7 +126,12 @@ export const mockHandlers = {
   getHello: () => ok({ message: 'SneakerLocal Mock API — development mode' }),
 
   login: (body: { email: string; password: string }) => {
-    const user = findMockUserByCredentials(body.email, body.password);
+    const state = getMockState();
+    const registered = state.users.find(
+      (u) => u.email.toLowerCase() === body.email.toLowerCase() && u.password === body.password
+    );
+    const staticUser = findMockUserByCredentials(body.email, body.password);
+    const user = registered ?? staticUser;
     if (!user) return fail('Email atau password salah', 401);
     return ok({
       access_token: createMockAccessToken(user.id),
@@ -154,7 +159,21 @@ export const mockHandlers = {
 
   registerAdmin: async (body: { email: string; password: string }) => {
     await requireUser(['ADMIN']);
-    return mockHandlers.registerCustomer(body);
+    const state = getMockState();
+    if (state.users.some((u) => u.email.toLowerCase() === body.email.toLowerCase())) {
+      return fail('Email sudah terdaftar');
+    }
+    const user = {
+      id: nextId('usr'),
+      name: body.email.split('@')[0],
+      email: body.email,
+      password: body.password,
+      role: 'ADMIN' as const,
+      createdAt: new Date().toISOString(),
+    };
+    state.users.push(user);
+    setMockState(state);
+    return ok({ user: { id: user.id, email: user.email, role: user.role } }, 201);
   },
 
   getAllUsers: async () => {
@@ -203,7 +222,10 @@ export const mockHandlers = {
         productId: product.id,
         color: String(body.color),
         colorHex: String(body.colorHex ?? '#888888'),
-        size: Number(body.size),
+        sizeEU: Number(body.sizeEU ?? body.size),
+        sizeUS: body.sizeUS ? String(body.sizeUS) : undefined,
+        sizeUK: body.sizeUK ? String(body.sizeUK) : undefined,
+        sizeCM: body.sizeCM ? Number(body.sizeCM) : undefined,
         stock: Number(body.stock ?? body.initialStock ?? 0),
         price: body.price ? Number(body.price) : undefined,
       };
@@ -253,6 +275,16 @@ export const mockHandlers = {
     return ok(enrichProduct(product));
   },
 
+  deleteProduct: async (id: string) => {
+    await requireUser(['ADMIN']);
+    const state = getMockState();
+    const idx = state.products.findIndex((p) => p.id === id);
+    if (idx < 0) return fail('Product not found', 404);
+    state.products.splice(idx, 1);
+    setMockState(state);
+    return ok({ success: true });
+  },
+
   updateSku: async (id: string, body: Record<string, unknown>) => {
     await requireUser(['ADMIN']);
     const state = getMockState();
@@ -261,11 +293,14 @@ export const mockHandlers = {
       if (!sku) continue;
       if (body.color) sku.color = String(body.color);
       if (body.colorHex) sku.colorHex = String(body.colorHex);
-      if (body.size) sku.size = Number(body.size);
+      if (body.sizeEU !== undefined) sku.sizeEU = Number(body.sizeEU);
+      if (body.sizeUS !== undefined) sku.sizeUS = String(body.sizeUS);
+      if (body.sizeUK !== undefined) sku.sizeUK = String(body.sizeUK);
+      if (body.sizeCM !== undefined) sku.sizeCM = Number(body.sizeCM);
       if (body.stock !== undefined) sku.stock = Number(body.stock);
       if (body.price !== undefined) sku.price = Number(body.price);
       setMockState(state);
-      return ok(sku);
+      return ok({ ...sku });
     }
     return fail('SKU not found', 404);
   },
@@ -293,6 +328,67 @@ export const mockHandlers = {
     product.images = [url];
     setMockState(state);
     return ok({ imageUrl: url });
+  },
+
+  listBrands: (params?: Record<string, unknown>) => {
+    const state = getMockState();
+    let items = state.brands ?? [];
+    const q = String(params?.q ?? '').toLowerCase();
+    const isActiveParam = params?.isActive;
+    if (isActiveParam !== undefined) items = items.filter((b) => b.isActive === (isActiveParam === 'true'));
+    if (q) items = items.filter((b) => b.name.toLowerCase().includes(q) || b.slug.toLowerCase().includes(q));
+    return ok(paginate(items, params));
+  },
+
+  getBrand: (id: string) => {
+    const brand = getMockState().brands?.find((b) => b.id === id);
+    if (!brand) return fail('Brand not found', 404);
+    return ok(brand);
+  },
+
+  createBrand: async (body: { name: string; slug: string; logoUrl?: string }) => {
+    await requireUser(['ADMIN']);
+    const state = getMockState();
+    if (!state.brands) state.brands = [];
+    if (state.brands.some((b) => b.slug === body.slug)) return fail('Slug sudah ada');
+    const brand = {
+      id: nextId('brand'),
+      name: body.name,
+      slug: body.slug,
+      logoUrl: body.logoUrl ?? null,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    state.brands.push(brand);
+    setMockState(state);
+    return ok(brand, 201);
+  },
+
+  updateBrand: async (id: string, body: Record<string, unknown>) => {
+    await requireUser(['ADMIN']);
+    const state = getMockState();
+    const brand = state.brands?.find((b) => b.id === id);
+    if (!brand) return fail('Brand not found', 404);
+    if (body.name) brand.name = String(body.name);
+    if (body.slug && body.slug !== brand.slug) {
+      if (state.brands?.some((b) => b.slug === body.slug)) return fail('Slog sudah digunakan');
+      brand.slug = String(body.slug);
+    }
+    if (body.logoUrl !== undefined) brand.logoUrl = String(body.logoUrl);
+    if (body.isActive !== undefined) brand.isActive = Boolean(body.isActive);
+    brand.updatedAt = new Date().toISOString();
+    setMockState(state);
+    return ok(brand);
+  },
+
+  deleteBrand: async (id: string) => {
+    await requireUser(['ADMIN']);
+    const state = getMockState();
+    if (!state.brands?.some((b) => b.id === id)) return fail('Brand not found', 404);
+    state.brands = state.brands.filter((b) => b.id !== id);
+    setMockState(state);
+    return ok({ success: true });
   },
 
   listCategories: (params?: Record<string, unknown>) => {
@@ -464,5 +560,55 @@ export const mockHandlers = {
     await requireUser();
     const blob = new Blob([`Struk Mock SneakerLocal\nOrder: ${id}`], { type: 'application/pdf' });
     return ok(blob);
+  },
+
+  exportOrders: async (format: string, status?: string) => {
+    await requireUser(['ADMIN']);
+    const state = getMockState();
+    let orders = [...state.orders];
+    if (status) orders = orders.filter((o) => o.status === status);
+
+    if (format === 'csv') {
+      const rows = orders.flatMap((o) =>
+        o.items.map((i) => [
+          o.id,
+          o.user?.email ?? '-',
+          o.user?.name ?? '-',
+          o.status,
+          new Date(o.createdAt).toLocaleDateString('id-ID'),
+          o.subtotal,
+          o.shippingFee,
+          o.total,
+          o.shippingType,
+          o.paymentMethod,
+          o.district ?? '-',
+          i.sku.product.name,
+          i.sku.color,
+          i.sku.sizeEU,
+          i.quantity,
+          i.price,
+        ].join(','))
+      );
+      const csvContent = ['id,email,name,status,date,subtotal,shippingFee,total,shippingType,paymentMethod,district,product,color,sizeEU,qty,price', ...rows].join('\n');
+      return ok(csvContent, 200);
+    } else if (format === 'json') {
+      const data = orders.map((o) => ({
+        id: o.id,
+        email: o.user?.email ?? '-',
+        name: o.user?.name ?? '-',
+        status: o.status,
+        date: o.createdAt,
+        total: o.total,
+        items: o.items.map((i) => ({
+          product: i.sku.product.name,
+          color: i.sku.color,
+          sizeEU: i.sku.sizeEU,
+          quantity: i.quantity,
+          price: i.price,
+        })),
+      }));
+      return ok(JSON.stringify(data, null, 2), 200);
+    }
+    return fail('Unsupported format', 400);
   },
 };

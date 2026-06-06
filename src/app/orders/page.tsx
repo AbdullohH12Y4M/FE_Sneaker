@@ -19,7 +19,8 @@ export default function OrdersPage() {
 
   const loadOrders = async () => {
     const response = await ordersApi.getMyOrders();
-    setOrders(parseOrdersList(response.data));
+    const parsed = parseOrdersList(response.data);
+    setOrders(parsed);
   };
 
   useEffect(() => {
@@ -45,10 +46,10 @@ export default function OrdersPage() {
   const handleUpload = async (orderId: string, file: File) => {
     const note = noteByOrderId[orderId] || undefined;
     setUploadingOrder(orderId);
+    setError('');
     try {
       await ordersApi.uploadProof(orderId, file, note);
       await loadOrders();
-      setError('');
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
     } finally {
@@ -136,9 +137,9 @@ export default function OrdersPage() {
                 <div className={styles.orderItem} key={item.id}>
                   <div>
                     <p className="font-medium">{item.sku?.product?.name ?? 'Produk'}</p>
-                    <p className="text-muted">
-                      {item.sku?.color} • EU {item.sku?.size}
-                    </p>
+<p className="text-muted">
+                       {item.sku?.color} • EU {item.sku?.sizeEU}
+                     </p>
                   </div>
                   <span>{item.quantity}</span>
                   <span>{formatPrice(item.priceAtPurchase * item.quantity)}</span>

@@ -136,7 +136,7 @@ export default function AdminInventoriesPage() {
                       {sku.color}
                     </div>
                   </td>
-                  <td style={{ padding: '16px' }}>{sku.size}</td>
+                  <td style={{ padding: '16px' }}>{sku.sizeEU}</td>
                   <td style={{ padding: '16px' }}>
                     <span className={`badge ${sku.stock > 0 ? 'badge-success' : 'badge-danger'}`}>
                       {sku.stock}

@@ -68,7 +68,10 @@ export type MockProductRecord = {
     productId: string;
     color: string;
     colorHex: string;
-    size: number;
+    sizeEU: number;
+    sizeUS?: string;
+    sizeUK?: string;
+    sizeCM?: number;
     stock: number;
     price?: number;
     inventory?: { stock: number };
@@ -96,10 +99,10 @@ export const mockProductCatalog: MockProductRecord[] = [
     category: mockCategories[0],
     images: [img('Sneaker+Hitam'), img('Sneaker+Putih', 'f8fafc', '111827')],
     skus: [
-      { id: 'sku-1', productId: 'prod-1', color: 'Hitam', colorHex: '#111827', size: 39, stock: 4, price: 249000 },
-      { id: 'sku-2', productId: 'prod-1', color: 'Hitam', colorHex: '#111827', size: 42, stock: 2, price: 249000 },
-      { id: 'sku-3', productId: 'prod-1', color: 'Putih', colorHex: '#f8fafc', size: 40, stock: 1, price: 249000 },
-      { id: 'sku-4', productId: 'prod-1', color: 'Merah', colorHex: '#dc2626', size: 41, stock: 3, price: 259000 },
+      { id: 'sku-1', productId: 'prod-1', color: 'Hitam', colorHex: '#111827', sizeEU: 39, stock: 4, price: 249000 },
+      { id: 'sku-2', productId: 'prod-1', color: 'Hitam', colorHex: '#111827', sizeEU: 42, stock: 2, price: 249000 },
+      { id: 'sku-3', productId: 'prod-1', color: 'Putih', colorHex: '#f8fafc', sizeEU: 40, stock: 1, price: 249000 },
+      { id: 'sku-4', productId: 'prod-1', color: 'Merah', colorHex: '#dc2626', sizeEU: 41, stock: 3, price: 259000 },
     ],
   },
   {
@@ -116,9 +119,9 @@ export const mockProductCatalog: MockProductRecord[] = [
     category: mockCategories[1],
     images: [img('Kasual+Navy', '1e293b', 'ffffff'), img('Kasual+Coklat', '7c4d24', 'ffffff')],
     skus: [
-      { id: 'sku-5', productId: 'prod-2', color: 'Navy', colorHex: '#1e293b', size: 38, stock: 5, price: 199000 },
-      { id: 'sku-6', productId: 'prod-2', color: 'Navy', colorHex: '#1e293b', size: 40, stock: 2, price: 199000 },
-      { id: 'sku-7', productId: 'prod-2', color: 'Coklat', colorHex: '#7c4d24', size: 42, stock: 6, price: 199000 },
+      { id: 'sku-5', productId: 'prod-2', color: 'Navy', colorHex: '#1e293b', sizeEU: 38, stock: 5, price: 199000 },
+      { id: 'sku-6', productId: 'prod-2', color: 'Navy', colorHex: '#1e293b', sizeEU: 40, stock: 2, price: 199000 },
+      { id: 'sku-7', productId: 'prod-2', color: 'Coklat', colorHex: '#7c4d24', sizeEU: 42, stock: 6, price: 199000 },
     ],
   },
   {
@@ -135,8 +138,8 @@ export const mockProductCatalog: MockProductRecord[] = [
     category: mockCategories[2],
     images: [img('Formal+Hitam'), img('Formal+Abu', '6b7280', 'ffffff')],
     skus: [
-      { id: 'sku-8', productId: 'prod-3', color: 'Hitam', colorHex: '#111827', size: 42, stock: 2, price: 329000 },
-      { id: 'sku-9', productId: 'prod-3', color: 'Abu', colorHex: '#6b7280', size: 41, stock: 1, price: 329000 },
+      { id: 'sku-8', productId: 'prod-3', color: 'Hitam', colorHex: '#111827', sizeEU: 42, stock: 2, price: 329000 },
+      { id: 'sku-9', productId: 'prod-3', color: 'Abu', colorHex: '#6b7280', sizeEU: 41, stock: 1, price: 329000 },
     ],
   },
   {
@@ -153,8 +156,8 @@ export const mockProductCatalog: MockProductRecord[] = [
     category: mockCategories[3],
     images: [img('Sandal+Hitam', '4b5563', 'ffffff'), img('Sandal+Kuning', 'f59e0b', '111827')],
     skus: [
-      { id: 'sku-10', productId: 'prod-4', color: 'Hitam', colorHex: '#111827', size: 39, stock: 7, price: 89000 },
-      { id: 'sku-11', productId: 'prod-4', color: 'Coklat', colorHex: '#7c4d24', size: 40, stock: 4, price: 89000 },
+      { id: 'sku-10', productId: 'prod-4', color: 'Hitam', colorHex: '#111827', sizeEU: 39, stock: 7, price: 89000 },
+      { id: 'sku-11', productId: 'prod-4', color: 'Coklat', colorHex: '#7c4d24', sizeEU: 40, stock: 4, price: 89000 },
     ],
   },
   {
@@ -171,8 +174,8 @@ export const mockProductCatalog: MockProductRecord[] = [
     category: mockCategories[4],
     images: [img('Boots+Hijau', '14532d', 'ffffff')],
     skus: [
-      { id: 'sku-12', productId: 'prod-5', color: 'Hijau', colorHex: '#16a34a', size: 41, stock: 3, price: 279000 },
-      { id: 'sku-13', productId: 'prod-5', color: 'Hitam', colorHex: '#111827', size: 43, stock: 2, price: 279000 },
+      { id: 'sku-12', productId: 'prod-5', color: 'Hijau', colorHex: '#16a34a', sizeEU: 41, stock: 3, price: 279000 },
+      { id: 'sku-13', productId: 'prod-5', color: 'Hitam', colorHex: '#111827', sizeEU: 43, stock: 2, price: 279000 },
     ],
   },
   {
@@ -190,8 +193,8 @@ export const mockProductCatalog: MockProductRecord[] = [
     category: mockCategories[0],
     images: [img('Runner+Biru', '1d4ed8', 'ffffff')],
     skus: [
-      { id: 'sku-14', productId: 'prod-6', color: 'Biru', colorHex: '#2563eb', size: 40, stock: 8, price: 319000 },
-      { id: 'sku-15', productId: 'prod-6', color: 'Biru', colorHex: '#2563eb', size: 42, stock: 5, price: 319000 },
+      { id: 'sku-14', productId: 'prod-6', color: 'Biru', colorHex: '#2563eb', sizeEU: 40, stock: 8, price: 319000 },
+      { id: 'sku-15', productId: 'prod-6', color: 'Biru', colorHex: '#2563eb', sizeEU: 42, stock: 5, price: 319000 },
     ],
   },
 ];

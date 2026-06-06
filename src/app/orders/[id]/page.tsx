@@ -131,7 +131,7 @@ export default function OrderDetailPage() {
           {order.items.map((item: OrderItem) => (
             <div key={item.id} style={{ borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
               <p className="font-medium">{item.sku?.product?.name ?? 'Produk'}</p>
-              <p className="text-muted">{item.sku?.color} • {item.sku?.size}</p>
+              <p className="text-muted">{item.sku?.color} • {item.sku?.sizeCM}</p>
               <p>{formatPrice(item.priceAtPurchase)} x {item.quantity}</p>
               <p><strong>Subtotal</strong> {formatPrice(item.priceAtPurchase * item.quantity)}</p>
             </div>

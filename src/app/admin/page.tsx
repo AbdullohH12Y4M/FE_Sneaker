@@ -1,39 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { ordersApi } from '@/lib/api';
 import { parseOrdersList } from '@/lib/api-helpers';
-import { extractErrorMessage } from '@/lib/utils';
+import { extractErrorMessage, formatPrice, ORDER_STATUS_LABELS } from '@/lib/utils';
 import styles from './page.module.css';
 
-interface OrderItem {
-  id: string;
-  orderId: string;
-  skuId: string;
-  quantity: number;
-  priceAtPurchase: number;
-  sku: {
-    id: string;
-    productId: string;
-    color: string;
-    size: string;
-  };
-}
-
-interface Order {
-  id: string;
-  userId: string;
-  status: string;
-  shippingType: string;
-  district?: string;
-  shippingAddress?: string;
-  items: OrderItem[];
-  total?: number;
-  totalPrice?: number;
-  createdAt: string;
-  user?: { email?: string; name?: string | null };
-}
+import type { Order, OrderStatus } from '@/types';
 
 const ORDER_STATUSES = ['PENDING', 'WAITING_CONFIRMATION', 'PAID', 'SHIPPED', 'CANCELLED'];
 
@@ -43,45 +17,33 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
 
-  useEffect(() => {
+  const fetchOrders = useCallback(async () => {
     if (!session?.user || session.user.role !== 'ADMIN') {
-      // keep effects pure: only update state via functional setters
-      setLoading((_) => false);
+      setLoading(false);
       return;
     }
 
+    try {
+      setLoading(true);
+      setError('');
+      const response = await ordersApi.getAllOrders({ limit: 100, status: statusFilter || undefined });
+      setOrders(parseOrdersList(response.data));
+    } catch (err: any) {
+      setError(extractErrorMessage(err));
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [session, statusFilter]);
 
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        try {
-          const response = await ordersApi.getAllOrders({ limit: 100 });
-          setOrders(parseOrdersList(response.data) as Order[]);
-        } catch (adminErr: any) {
-          if (adminErr.response?.status === 404) {
-            const fallback = await ordersApi.getMyOrders({ limit: 100 });
-            setOrders(parseOrdersList(fallback.data) as Order[]);
-            setError(
-              'Endpoint admin belum tersedia di backend. Menampilkan pesanan akun admin saja.'
-            );
-          } else {
-            throw adminErr;
-          }
-        }
-      } catch (err: any) {
-        setError(extractErrorMessage(err));
-        setOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchOrders();
-  }, [session]);
+  }, [fetchOrders]);
 
-  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
     setUpdating(orderId);
     try {
       await ordersApi.updateStatus(orderId, newStatus);
@@ -97,12 +59,71 @@ export default function AdminPage() {
     }
   };
 
+  const handleExport = async (format: 'csv' | 'json') => {
+    setExporting(format);
+    try {
+      const response = await ordersApi.exportOrders(format, statusFilter || undefined);
+      const blob =
+        response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: format === 'csv' ? 'text/csv' : 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `riwayat-transaksi.${format}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(extractErrorMessage(err));
+    } finally {
+      setExporting(null);
+    }
+  };
+
   if (!session || session.user.role !== 'ADMIN') {
     return null;
   }
 
+  const totalRevenue = orders
+    .filter((o) => o.status === 'PAID' || o.status === 'SHIPPED' || o.status === 'DELIVERED')
+    .reduce((sum, o) => sum + o.totalPrice, 0);
+
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <h2>Dashboard Admin</h2>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <select
+            className="form-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as OrderStatus | '')}
+            style={{ minWidth: '180px' }}
+          >
+            <option value="">Semua Status</option>
+            {ORDER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {ORDER_STATUS_LABELS[s] ?? s.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn btn-secondary"
+            onClick={() => handleExport('csv')}
+            disabled={exporting === 'csv'}
+          >
+            {exporting === 'csv' ? 'Mengekspor...' : 'Export CSV'}
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => handleExport('json')}
+            disabled={exporting === 'json'}
+          >
+            {exporting === 'json' ? 'Mengekspor...' : 'Export JSON'}
+          </button>
+        </div>
+      </div>
 
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
@@ -114,8 +135,8 @@ export default function AdminPage() {
           <h2>{orders.filter((o) => o.status === 'WAITING_CONFIRMATION').length}</h2>
         </div>
         <div className={styles.statCard}>
-          <p className="text-muted">Dalam Pengiriman</p>
-          <h2>{orders.filter((o) => o.status === 'SHIPPED').length}</h2>
+          <p className="text-muted">Total Pendapatan</p>
+          <h2>{formatPrice(totalRevenue)}</h2>
         </div>
       </div>
 
@@ -142,7 +163,7 @@ export default function AdminPage() {
                 <div style={{ flex: 1 }}>
                   <p className="font-medium">Pesanan #{order.id}</p>
                   <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '4px' }}>
-                    {order.user?.email ?? order.userId} • {order.shippingType} • {order.items.length} item • {new Date(order.createdAt).toLocaleDateString('id-ID')}
+                    {order.user?.email ?? order.userId} • {ORDER_STATUS_LABELS[order.status] ?? order.status} • {order.items.length} item • {new Date(order.createdAt).toLocaleDateString('id-ID')} • {formatPrice(order.totalPrice)}
                   </p>
                 </div>
                 <div className={styles.orderActions} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -151,11 +172,11 @@ export default function AdminPage() {
                       key={status}
                       type="button"
                       className={`btn btn-sm ${order.status === status ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => handleStatusUpdate(order.id, status)}
+                      onClick={() => handleStatusUpdate(order.id, status as OrderStatus)}
                       disabled={updating === order.id}
                       style={{ minWidth: '100px', whiteSpace: 'nowrap' }}
                     >
-                      {updating === order.id ? '...' : status.replace(/_/g, ' ')}
+                      {updating === order.id ? '...' : ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, ' ')}
                     </button>
                   ))}
                 </div>

@@ -173,14 +173,14 @@ export default function ProductDetailPage() {
     if (!product || !selectedColor) return [] as number[];
     return (product.skus || [])
       .filter((sku: ProductSKU) => sku.color === selectedColor && sku.stock > 0)
-      .map((sku: ProductSKU) => sku.size)
+      .map((sku: ProductSKU) => sku.sizeEU)
       .sort((a: number, b: number) => a - b);
   }, [product, selectedColor]);
 
   const selectedSku = useMemo<ProductSKU | null>(() => {
     if (!product || !selectedColor || selectedSize === null) return null;
     return (product.skus || []).find(
-      (sku: ProductSKU) => sku.color === selectedColor && sku.size === selectedSize
+      (sku: ProductSKU) => sku.color === selectedColor && sku.sizeEU === selectedSize
     ) ?? null;
   }, [product, selectedColor, selectedSize]);
 
@@ -210,7 +210,7 @@ export default function ProductDetailPage() {
       image: displayImage,
       color: selectedSku.color,
       colorHex: selectedSku.colorHex,
-      size: selectedSku.size,
+      sizeEU: selectedSku.sizeEU,
       price: selectedSku.price ?? product.basePrice,
       quantity,
       maxStock: selectedSku.stock,
