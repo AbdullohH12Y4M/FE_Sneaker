@@ -28,26 +28,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Pesanan', path: '/admin' },
     { name: 'Produk', path: '/admin/products' },
     { name: 'Kategori', path: '/admin/categories' },
+    { name: 'Brand', path: '/admin/brands' },
     { name: 'Varian SKU', path: '/admin/skus' },
     { name: 'Inventaris', path: '/admin/inventories' },
     { name: 'Pengguna', path: '/admin/users' },
   ];
+
+  const isActiveTab = (tabPath: string) => {
+    if (tabPath === '/admin') return pathname === '/admin';
+    return pathname.startsWith(tabPath);
+  };
 
   return (
     <div className="container" style={{ padding: '40px 0' }}>
       <div style={{ marginBottom: '24px' }}>
         <p className="sectionLabel">Admin Panel</p>
         <h1 className="sectionTitle">Manajemen Toko</h1>
+        <Link href="/" style={{ fontSize: '0.875rem', color: 'var(--color-primary)', marginTop: '8px', display: 'inline-block' }}>
+          &larr; Kembali ke Toko
+        </Link>
       </div>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', borderBottom: '1px solid var(--color-border)' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', borderBottom: '1px solid var(--color-border)', overflowX: 'auto' }}>
         {tabs.map((tab) => {
-          const isActive = pathname === tab.path;
+          const isActive = isActiveTab(tab.path);
           return (
             <Link
               key={tab.path}
               href={tab.path}
               style={{
                 padding: '12px 24px',
+                whiteSpace: 'nowrap',
                 borderBottom: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
                 fontWeight: isActive ? 600 : 400,
                 color: isActive ? 'var(--color-text)' : 'var(--color-text-muted)',

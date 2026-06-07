@@ -216,7 +216,7 @@ export default function Navbar() {
                       <hr className="divider" />
                       <button
                         className={`${styles.dropdownItem} ${styles.dropdownItemDanger}`}
-                        onClick={() => { signOut(); setUserMenuOpen(false); }}
+                        onClick={() => { localStorage.removeItem('access_token'); signOut({ callbackUrl: '/' }); setUserMenuOpen(false); }}
                       >
                         <FiLogOut size={16} /> Keluar
                       </button>
@@ -258,7 +258,29 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {!session && (
+              {session ? (
+                <>
+                  <hr className="divider" />
+                  <Link href="/orders" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                    <FiArchive size={16} /> Pesanan Saya
+                  </Link>
+                  <Link href="/profile" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                    <FiUser size={16} /> Profil Saya
+                  </Link>
+                  {session.user?.role === 'ADMIN' && (
+                    <Link href="/admin" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                      <FiSettings size={16} /> Dashboard Admin
+                    </Link>
+                  )}
+                  <button
+                    className={`${styles.mobileLink} ${styles.dropdownItemDanger}`}
+                    onClick={() => { localStorage.removeItem('access_token'); signOut({ callbackUrl: '/' }); setMobileOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', border: 'none', background: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                  >
+                    <FiLogOut size={16} /> Keluar
+                  </button>
+                </>
+              ) : (
                 <Link href="/login" className="btn btn-primary btn-full" style={{ marginTop: 8 }} onClick={() => setMobileOpen(false)}>
                   <FiUser size={16} /> Masuk
                 </Link>
