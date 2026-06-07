@@ -1,15 +1,55 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import type { NextRequest } from 'next/server';
 
-export default auth((req) => {
-  const { nextUrl, auth: session } = req;
-  const isLoggedIn = !!session;
+function decodeJwt(token: string) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    return JSON.parse(Buffer.from(payload, 'base64').toString());
+  } catch {
+    return null;
+  }
+}
+
+function getSessionFromRequest(request: NextRequest) {
+  const cookieHeader = request.headers.get('cookie');
+  if (!cookieHeader) return null;
+  
+  const cookies = Object.fromEntries(
+    cookieHeader.split(';').map(c => {
+      const [key, ...val] = c.trim().split('=');
+      return [key, val.join('=')];
+    })
+  );
+  
+  // Try both authjs.session.token and next-auth.session-token patterns
+  const sessionToken = cookies['authjs.session.token'] || cookies['next-auth.session-token'];
+  if (!sessionToken) return null;
+  
+  const payload = decodeJwt(sessionToken);
+  if (!payload) return null;
+  
+  return {
+    user: {
+      id: payload.id as string | undefined,
+      email: payload.email as string | undefined,
+      role: payload.role as string | undefined,
+    },
+  };
+}
+
+export async function middleware(request: NextRequest) {
+  const nextUrl = request.nextUrl;
+  const session = getSessionFromRequest(request);
+  const isLoggedIn = !!session?.user?.id;
   const isAdmin = session?.user?.role === 'ADMIN';
 
   // Admin routes — require ADMIN role
   if (nextUrl.pathname.startsWith('/admin')) {
     if (!isLoggedIn) {
-      return NextResponse.redirect(new URL('/login?callbackUrl=/admin', nextUrl));
+      const loginUrl = new URL('/login', nextUrl);
+      loginUrl.searchParams.set('callbackUrl', '/admin');
+      return NextResponse.redirect(loginUrl);
     }
     if (!isAdmin) {
       return NextResponse.redirect(new URL('/', nextUrl));
@@ -27,9 +67,9 @@ export default auth((req) => {
 
   if (isProtected && !isLoggedIn) {
     const callbackUrl = encodeURIComponent(nextUrl.pathname + nextUrl.search);
-    return NextResponse.redirect(
-      new URL(`/login?callbackUrl=${callbackUrl}`, nextUrl)
-    );
+    const loginUrl = new URL('/login', nextUrl);
+    loginUrl.searchParams.set('callbackUrl', callbackUrl);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Already logged in, redirect away from auth pages
@@ -38,7 +78,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
