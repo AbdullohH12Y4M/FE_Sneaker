@@ -16,7 +16,7 @@ export const GET = createHandler(
 
 export const POST = createHandler(
   async (req: NextRequest, ctx) => {
-    const body = (req as any).validatedBody;
+    const body = ctx.body;
     const item = await CartService.addItem(ctx.user!.id, body);
     return {
       message: 'Produk berhasil ditambahkan ke keranjang',

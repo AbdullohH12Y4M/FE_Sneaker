@@ -14,7 +14,12 @@ export const GET = createHandler(async (req: NextRequest, ctx) => {
 export const PATCH = createHandler(
   async (req: NextRequest, ctx) => {
     const id = ctx.params.id;
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      throw new Error('Format JSON tidak valid atau kosong');
+    }
     const adminId = ctx.user!.id;
 
     const updated = await CategoryService.updateCategory(adminId, id, body);

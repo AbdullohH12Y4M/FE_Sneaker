@@ -17,7 +17,7 @@ export const GET = createHandler(async (req: NextRequest) => {
 
 export const POST = createHandler(
   async (req: NextRequest, ctx) => {
-    const body = (req as any).validatedBody;
+    const body = ctx.body;
     const adminId = ctx.user!.id;
     const category = await CategoryService.createCategory(adminId, body);
     return {

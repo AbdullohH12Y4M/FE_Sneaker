@@ -16,7 +16,7 @@ export const GET = createHandler(
 
 export const PATCH = createHandler(
   async (req: NextRequest, ctx) => {
-    const body = (req as any).validatedBody;
+    const body = ctx.body;
     const user = await UserService.updateProfile(ctx.user!.id, body);
     return {
       message: 'Profil berhasil diperbarui',

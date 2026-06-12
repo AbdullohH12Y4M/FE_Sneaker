@@ -48,7 +48,7 @@ export function createHandler<TBody = any, TParams = any>(
       // 3. VALIDATION WITH CONTENT-TYPE CHECK
       if (options?.schema) {
         const contentType = req.headers.get('content-type') || '';
-        
+
         if (!contentType.includes('application/json')) {
           throw new ValidationError('Content-Type harus application/json');
         }
@@ -65,9 +65,8 @@ export function createHandler<TBody = any, TParams = any>(
         if (!parsed.success) {
           const fieldErrors: Record<string, string[]> = {};
 
-          // FIX: Menggunakan .issues, bukan .errors
           parsed.error.issues.forEach((err) => {
-            const path = err.path.join('.');
+            const path = err.path.join('.') || '_root';
             fieldErrors[path] = fieldErrors[path] || [];
             fieldErrors[path].push(err.message);
           });
@@ -82,15 +81,47 @@ export function createHandler<TBody = any, TParams = any>(
       // 4. EXECUTE HANDLER
       const result = await handler(req, ctx);
 
-      if (result instanceof NextResponse) return result;
+      // Handler returned a NextResponse directly — pass through as-is
+      if (result instanceof NextResponse || result instanceof Response) return result;
 
       // 5. UNIFIED RESPONSE FORMAT
       return NextResponse.json({
         success: true,
         message: result?.message ?? 'OK',
-        data: result?.data !== undefined ? result.data : result,
+        data: result?.data !== undefined ? result.data : null,
       });
     } catch (error) {
+      // Prisma known error codes → map to user-friendly AppError
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        typeof (error as any).code === 'string'
+      ) {
+        const prismaError = error as any;
+        if (prismaError.code === 'P2002') {
+          // Unique constraint violation
+          const field = prismaError.meta?.target?.join(', ') ?? 'field';
+          return NextResponse.json(
+            { success: false, message: `Data duplikat: ${field} sudah digunakan` },
+            { status: 409 }
+          );
+        }
+        if (prismaError.code === 'P2025') {
+          // Record not found (e.g. update/delete on missing row)
+          return NextResponse.json(
+            { success: false, message: 'Data tidak ditemukan' },
+            { status: 404 }
+          );
+        }
+        if (prismaError.code === 'P2003') {
+          // Foreign key constraint failed
+          return NextResponse.json(
+            { success: false, message: 'Operasi gagal: data terkait masih digunakan' },
+            { status: 409 }
+          );
+        }
+      }
+
       return handleApiError(error);
     }
   };

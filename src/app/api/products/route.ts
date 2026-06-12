@@ -24,22 +24,50 @@ export const GET = createHandler(async (req: NextRequest) => {
 
 export const POST = createHandler(
   async (req: NextRequest, ctx) => {
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      throw new Error('Format JSON tidak valid atau kosong');
+    }
+
     const adminId = ctx.user!.id;
 
     if (body.type === 'SKU') {
-      // Validate SKU schema
-      const parsed = ProductSkuSchema.parse(body);
-      const sku = await ProductService.createSku(adminId, parsed);
+      const parsed = ProductSkuSchema.safeParse(body);
+      if (!parsed.success) {
+        const fieldErrors: Record<string, string[]> = {};
+        parsed.error.issues.forEach((err) => {
+          const path = err.path.join('.');
+          fieldErrors[path] = fieldErrors[path] || [];
+          fieldErrors[path].push(err.message);
+        });
+        return new Response(
+          JSON.stringify({ success: false, message: 'Validasi SKU gagal', errors: fieldErrors }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      const sku = await ProductService.createSku(adminId, parsed.data);
       return {
         message: 'SKU berhasil ditambahkan',
         data: sku,
       };
     }
 
-    // Validate Product schema
-    const parsed = ProductSchema.parse(body);
-    const product = await ProductService.createProduct(adminId, parsed);
+    const parsed = ProductSchema.safeParse(body);
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string[]> = {};
+      parsed.error.issues.forEach((err) => {
+        const path = err.path.join('.');
+        fieldErrors[path] = fieldErrors[path] || [];
+        fieldErrors[path].push(err.message);
+      });
+      return new Response(
+        JSON.stringify({ success: false, message: 'Validasi produk gagal', errors: fieldErrors }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    const product = await ProductService.createProduct(adminId, parsed.data);
     return {
       message: 'Produk berhasil dibuat',
       data: product,
