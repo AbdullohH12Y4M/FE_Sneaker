@@ -198,8 +198,8 @@ export const ProductService = {
     }
 
     const product = await ProductRepository.create({
-      categoryId: data.categoryId,
-      brandId: data.brandId,
+      category: data.categoryId,
+      brand: data.brandId,
       name: data.name,
       slug: data.slug,
       skuCode: data.skuCode,
@@ -248,7 +248,7 @@ export const ProductService = {
   // SKUs and Stock
   async createSku(adminId: string, data: any) {
     const sku = await ProductRepository.createSku({
-      productId: data.productId,
+      product: data.productId,
       color: data.color,
       colorHex: data.colorHex || '#888888',
       sizeEU: Number(data.sizeEU),
