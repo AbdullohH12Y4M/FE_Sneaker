@@ -8,14 +8,58 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String
   name      String?
-  role      Role     @default(CUSTOMER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role      Role      @default(CUSTOMER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
   orders    Order[]
+  addresses Address[]
+  cart      Cart?
+}
+
+model Address {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String    // e.g. Rumah, Kantor
+  recipientName String
+  phoneNumber   String
+  fullAddress   String
+  province      String?
+  city          String?
+  district      String?
+  postalCode    String?
+  isDefault     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  items     CartItem[]
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CartItem {
+  id           String     @id @default(cuid())
+  cartId       String
+  productSkuId String
+  quantity     Int
+
+  cart         Cart       @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  sku          ProductSKU @relation(fields: [productSkuId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productSkuId])
 }
 
 model Brand {
@@ -37,6 +81,7 @@ model Category {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
   products    Product[]
 }
 
@@ -55,6 +100,7 @@ model Product {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
 
   category    Category     @relation(fields: [categoryId], references: [id])
   brand       Brand?       @relation(fields: [brandId], references: [id])
@@ -76,6 +122,8 @@ model ProductSKU {
   product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   inventory Inventory?
   orderItems OrderItem[]
+  cartItems  CartItem[]
+  movements  InventoryMovement[]
 
   @@unique([productId, color, sizeEU])
 }
@@ -96,6 +144,17 @@ model Inventory {
   updatedAt DateTime @updatedAt
 
   sku ProductSKU @relation(fields: [skuId], references: [id], onDelete: Cascade)
+}
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  skuId     String
+  quantity  Int      // + for restock, - for purchase/return
+  type      String   // RESTOCK, PURCHASE, RETURN, ADJUSTMENT
+  note      String?
+  createdAt DateTime @default(now())
+
+  sku       ProductSKU @relation(fields: [skuId], references: [id], onDelete: Cascade)
 }
 
 model Order {
@@ -131,9 +190,26 @@ model OrderItem {
   sku   ProductSKU @relation(fields: [skuId], references: [id])
 }
 
+model AppSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
 enum Role {
   CUSTOMER
   ADMIN
+  STAFF
 }
 
 enum OrderStatus {

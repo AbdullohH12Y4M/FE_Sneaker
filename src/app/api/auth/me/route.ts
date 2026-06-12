@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
 import { createHandler } from '@/server/utils/route-handler';
-import { OrderService } from '@/server/services';
+import { UserService } from '@/server/services';
 
 export const GET = createHandler(
   async (req: NextRequest, ctx) => {
-    const orders = await OrderService.getMyOrders(ctx.user!.id);
+    const userId = ctx.user!.id;
+    const profile = await UserService.getProfile(userId);
     return {
-      message: 'Pesanan Anda berhasil diambil',
-      data: orders,
+      message: 'Profile berhasil diambil',
+      data: profile,
     };
   },
   { requiredAuth: true }

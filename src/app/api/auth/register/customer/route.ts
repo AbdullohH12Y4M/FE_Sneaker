@@ -1,29 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { hashPassword } from '@/lib/password';
+import { NextRequest } from 'next/server';
+import { createHandler } from '@/server/utils/route-handler';
+import { RegisterSchema } from '@/server/validators/schemas';
+import { UserService } from '@/server/services';
 
-export async function POST(req: NextRequest) {
-  try {
-    const { email, password } = await req.json();
-
-    if (!email || !password) {
-      return NextResponse.json({ message: 'Email dan password wajib diisi' }, { status: 400 });
-    }
-
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ message: 'Email sudah terdaftar' }, { status: 400 });
-    }
-
-    const hashed = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: { email, password: hashed, role: 'CUSTOMER' },
-      select: { id: true, email: true, role: true },
-    });
-
-    return NextResponse.json({ user }, { status: 201 });
-  } catch (e) {
-    console.error('[register/customer]', e);
-    return NextResponse.json({ message: 'Server error' }, { status: 500 });
-  }
-}
+export const POST = createHandler(
+  async (req: NextRequest) => {
+    const body = (req as any).validatedBody;
+    const user = await UserService.register({ ...body, role: 'CUSTOMER' });
+    return {
+      message: 'Registrasi berhasil',
+      data: { user },
+    };
+  },
+  { schema: RegisterSchema }
+);

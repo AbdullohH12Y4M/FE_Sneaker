@@ -6,15 +6,11 @@ import { UserService } from '@/server/services';
 export const POST = createHandler(
   async (req: NextRequest) => {
     const body = (req as any).validatedBody;
-    const user = await UserService.register({ ...body, role: 'ADMIN' });
+    const user = await UserService.register(body);
     return {
-      message: 'Registrasi admin berhasil',
+      message: 'Registrasi berhasil',
       data: { user },
     };
   },
-  {
-    requiredAuth: true,
-    requiredRoles: ['ADMIN'],
-    schema: RegisterSchema,
-  }
+  { schema: RegisterSchema }
 );

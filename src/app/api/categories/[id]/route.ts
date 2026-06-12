@@ -1,80 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { requireAdmin, isErrorResponse } from '@/lib/server-auth';
+import { NextRequest } from 'next/server';
+import { createHandler } from '@/server/utils/route-handler';
+import { CategoryService } from '@/server/services';
 
-type Params = { params: Promise<{ id: string }> };
+export const GET = createHandler(async (req: NextRequest, ctx) => {
+  const id = ctx.params.id;
+  const category = await CategoryService.getCategory(id);
+  return {
+    message: 'Kategori berhasil diambil',
+    data: category,
+  };
+});
 
-// GET /api/categories/[id] — public
-export async function GET(_req: NextRequest, { params }: Params) {
-  try {
-    const { id } = await params;
-    const category = await prisma.category.findUnique({ where: { id } });
-    if (!category) {
-      return NextResponse.json({ message: 'Kategori tidak ditemukan' }, { status: 404 });
-    }
-    return NextResponse.json(category);
-  } catch (e) {
-    console.error('[categories/[id] GET]', e);
-    return NextResponse.json({ message: 'Server error' }, { status: 500 });
-  }
-}
-
-// PATCH /api/categories/[id] — admin only
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
-  if (isErrorResponse(authResult)) return authResult;
-
-  try {
-    const { id } = await params;
+export const PATCH = createHandler(
+  async (req: NextRequest, ctx) => {
+    const id = ctx.params.id;
     const body = await req.json();
+    const adminId = ctx.user!.id;
 
-    const existing = await prisma.category.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ message: 'Kategori tidak ditemukan' }, { status: 404 });
-    }
-
-    if (body.slug && body.slug !== existing.slug) {
-      const slugTaken = await prisma.category.findUnique({ where: { slug: body.slug } });
-      if (slugTaken) {
-        return NextResponse.json({ message: 'Slug sudah digunakan' }, { status: 400 });
-      }
-    }
-
-    const updated = await prisma.category.update({
-      where: { id },
-      data: {
-        ...(body.name !== undefined && { name: body.name }),
-        ...(body.slug !== undefined && { slug: body.slug }),
-        ...(body.isActive !== undefined && { isActive: body.isActive }),
-      },
-    });
-
-    return NextResponse.json(updated);
-  } catch (e) {
-    console.error('[categories/[id] PATCH]', e);
-    return NextResponse.json({ message: 'Server error' }, { status: 500 });
+    const updated = await CategoryService.updateCategory(adminId, id, body);
+    return {
+      message: 'Kategori berhasil diubah',
+      data: updated,
+    };
+  },
+  {
+    requiredAuth: true,
+    requiredRoles: ['ADMIN', 'STAFF'],
   }
-}
+);
 
-// DELETE /api/categories/[id] — admin only
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
-  if (isErrorResponse(authResult)) return authResult;
+export const DELETE = createHandler(
+  async (req: NextRequest, ctx) => {
+    const id = ctx.params.id;
+    const adminId = ctx.user!.id;
 
-  try {
-    const { id } = await params;
-    const existing = await prisma.category.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, message: 'Category does not exist', data: null },
-        { status: 404 }
-      );
-    }
-
-    await prisma.category.delete({ where: { id } });
-    return NextResponse.json({ success: true, message: 'Kategori berhasil dihapus', data: null });
-  } catch (e) {
-    console.error('[categories/[id] DELETE]', e);
-    return NextResponse.json({ message: 'Server error' }, { status: 500 });
+    const result = await CategoryService.deleteCategory(adminId, id);
+    return {
+      message: 'Kategori berhasil dihapus',
+      data: result,
+    };
+  },
+  {
+    requiredAuth: true,
+    requiredRoles: ['ADMIN', 'STAFF'],
   }
-}
+);

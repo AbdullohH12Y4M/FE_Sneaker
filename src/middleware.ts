@@ -22,8 +22,8 @@ function getSessionFromRequest(request: NextRequest) {
     })
   );
   
-  // Try both authjs.session.token and next-auth.session-token patterns
-  const sessionToken = cookies['authjs.session.token'] || cookies['next-auth.session-token'];
+  // Try both authjs.session.token, next-auth.session-token, and our custom access_token patterns
+  const sessionToken = cookies['access_token'] || cookies['authjs.session.token'] || cookies['next-auth.session-token'];
   if (!sessionToken) return null;
   
   const payload = decodeJwt(sessionToken);
