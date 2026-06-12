@@ -7,7 +7,7 @@
   "build": "next build",
   "start": "next start",
   "lint": "eslint",
-  "postinstall": "prisma generate"
+  "postinstall": "prisma generate"  
 },
   "prisma": {
     "seed": "node prisma/seed.ts"
@@ -46,3 +46,6 @@
     "typescript": "^5"
   }
 }
+
+
+
