@@ -1,74 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, TokenPayload } from '../auth/jwt';
-import { handleApiError, AppError, UnauthorizedError, ValidationError, ForbiddenError } from '../errors';
+import { handleApiError, ValidationError, UnauthorizedError, ForbiddenError } from '../errors';
 import { z } from 'zod';
 
-type HandlerContext = {
-  params?: any;
+// Definisikan tipe generic agar body dan params bisa menyesuaikan skema masing-masing route
+type HandlerContext<TBody = any, TParams = any> = {
+  params: TParams;
   user?: TokenPayload;
+  body?: TBody;
 };
 
-type RouteHandlerFn = (
+type RouteHandlerFn<TBody = any, TParams = any> = (
   req: NextRequest,
-  ctx: HandlerContext
+  ctx: HandlerContext<TBody, TParams>
 ) => Promise<NextResponse | any>;
 
-export function createHandler(
-  handler: RouteHandlerFn,
+export function createHandler<TBody = any, TParams = any>(
+  handler: RouteHandlerFn<TBody, TParams>,
   options?: {
     requiredAuth?: boolean;
     requiredRoles?: string[];
-    schema?: z.ZodSchema;
+    schema?: z.ZodSchema<TBody>;
   }
 ) {
-  return async (req: NextRequest, { params }: { params?: any }) => {
+  // Next.js 16: params adalah Promise
+  return async (req: NextRequest, { params }: { params?: Promise<TParams> }) => {
     try {
-      const ctx: HandlerContext = { params: params ? await params : undefined };
+      // 1. Resolve params seawal mungkin
+      const resolvedParams = params ? await params : ({} as TParams);
+      const ctx: HandlerContext<TBody, TParams> = { params: resolvedParams };
 
-      // Auth guard
+      // 2. AUTHENTICATION & AUTHORIZATION
       if (options?.requiredAuth || options?.requiredRoles) {
         const user = await getAuthUser(req);
+
         if (!user) {
           throw new UnauthorizedError('Silakan login terlebih dahulu');
         }
+
         if (options.requiredRoles && !options.requiredRoles.includes(user.role)) {
           throw new ForbiddenError('Akses ditolak. Peran Anda tidak diizinkan.');
         }
+
         ctx.user = user;
       }
 
-      // Input Validation
+      // 3. VALIDATION WITH CONTENT-TYPE CHECK
       if (options?.schema) {
-        try {
-          const body = await req.json();
-          const parsed = options.schema.safeParse(body);
-          if (!parsed.success) {
-            const fieldErrors: Record<string, string[]> = {};
-            parsed.error.errors.forEach((err) => {
-              const path = err.path.join('.');
-              if (!fieldErrors[path]) fieldErrors[path] = [];
-              fieldErrors[path].push(err.message);
-            });
-            throw new ValidationError('Validasi input gagal', fieldErrors);
-          }
-          // Attach parsed data to request for access inside handlers
-          (req as any).validatedBody = parsed.data;
-        } catch (e) {
-          if (e instanceof ValidationError) throw e;
-          throw new ValidationError('Format JSON tidak valid');
+        const contentType = req.headers.get('content-type') || '';
+        
+        if (!contentType.includes('application/json')) {
+          throw new ValidationError('Content-Type harus application/json');
         }
+
+        let body: any;
+        try {
+          body = await req.json();
+        } catch {
+          throw new ValidationError('Format JSON tidak valid atau kosong');
+        }
+
+        const parsed = options.schema.safeParse(body);
+
+        if (!parsed.success) {
+          const fieldErrors: Record<string, string[]> = {};
+
+          // FIX: Menggunakan .issues, bukan .errors
+          parsed.error.issues.forEach((err) => {
+            const path = err.path.join('.');
+            fieldErrors[path] = fieldErrors[path] || [];
+            fieldErrors[path].push(err.message);
+          });
+
+          throw new ValidationError('Validasi input gagal', fieldErrors);
+        }
+
+        // Data hasil parse yang sudah bersih dimasukkan ke ctx
+        ctx.body = parsed.data;
       }
 
+      // 4. EXECUTE HANDLER
       const result = await handler(req, ctx);
 
-      if (result instanceof NextResponse) {
-        return result;
-      }
+      if (result instanceof NextResponse) return result;
 
+      // 5. UNIFIED RESPONSE FORMAT
       return NextResponse.json({
         success: true,
-        message: result.message || 'Operasi berhasil',
-        data: result.data || result,
+        message: result?.message ?? 'OK',
+        data: result?.data !== undefined ? result.data : result,
       });
     } catch (error) {
       return handleApiError(error);
