@@ -1,10 +1,17 @@
 import { z } from 'zod';
 
+// Schema untuk register publik (customer) — TIDAK ada field role
 export const RegisterSchema = z.object({
   email: z.string().email('Email tidak valid'),
   password: z.string().min(6, 'Password minimal 6 karakter'),
   name: z.string().optional(),
-  role: z.enum(['CUSTOMER', 'ADMIN', 'STAFF']).optional(),
+});
+
+// Schema untuk register admin (dipakai oleh endpoint admin-only)
+export const RegisterAdminSchema = z.object({
+  email: z.string().email('Email tidak valid'),
+  password: z.string().min(6, 'Password minimal 6 karakter'),
+  name: z.string().optional(),
 });
 
 export const LoginSchema = z.object({

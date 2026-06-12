@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/brands — admin only
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

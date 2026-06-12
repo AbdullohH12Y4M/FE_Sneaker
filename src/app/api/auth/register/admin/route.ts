@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createHandler } from '@/server/utils/route-handler';
-import { RegisterSchema } from '@/server/validators/schemas';
+import { RegisterAdminSchema } from '@/server/validators/schemas';
 import { UserService } from '@/server/services';
 
 export const POST = createHandler(
@@ -15,6 +15,6 @@ export const POST = createHandler(
   {
     requiredAuth: true,
     requiredRoles: ['ADMIN'],
-    schema: RegisterSchema,
+    schema: RegisterAdminSchema,
   }
 );

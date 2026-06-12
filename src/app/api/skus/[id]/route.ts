@@ -6,7 +6,7 @@ type Params = { params: Promise<{ id: string }> };
 
 // PATCH /api/skus/[id] — admin, update SKU variant
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {
@@ -55,8 +55,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 // DELETE /api/skus/[id] — admin
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

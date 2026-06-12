@@ -10,7 +10,7 @@ type Params = { params: Promise<{ slug: string }> };
  * The [slug] param is treated as an ID for mutations.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: Params) {
  * Remove a specific product image.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

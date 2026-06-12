@@ -6,7 +6,7 @@ type Params = { params: Promise<{ skuId: string }> };
 
 // PATCH /api/inventories/[skuId] — admin, update stock
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

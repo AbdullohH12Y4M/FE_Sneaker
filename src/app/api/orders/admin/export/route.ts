@@ -4,7 +4,7 @@ import { requireAdmin, isErrorResponse } from '@/lib/server-auth';
 
 // GET /api/orders/admin/export — admin only, export transactions to various formats
 export async function GET(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

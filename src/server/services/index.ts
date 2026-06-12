@@ -164,7 +164,7 @@ export const ProductService = {
     const skip = (page - 1) * limit;
 
     const [items, total] = await Promise.all([
-      ProductRepository.findMany({ ...params, skip, limit }),
+      ProductRepository.findMany({ ...params, skip, take: limit }),
       ProductRepository.count(params),
     ]);
 
@@ -198,8 +198,8 @@ export const ProductService = {
     }
 
     const product = await ProductRepository.create({
-      category: data.categoryId,
-      brand: data.brandId,
+      categoryId: data.categoryId,
+      brandId: data.brandId ?? undefined,
       name: data.name,
       slug: data.slug,
       skuCode: data.skuCode,
@@ -248,7 +248,7 @@ export const ProductService = {
   // SKUs and Stock
   async createSku(adminId: string, data: any) {
     const sku = await ProductRepository.createSku({
-      product: data.productId,
+      product: { connect: { id: data.productId } },
       color: data.color,
       colorHex: data.colorHex || '#888888',
       sizeEU: Number(data.sizeEU),
@@ -550,7 +550,7 @@ export const AdminService = {
     const [orders, users, activeProducts, logs] = await Promise.all([
       OrderRepository.findAll(),
       UserRepository.findAll(),
-      ProductRepository.findMany({ isActive: true }),
+      ProductRepository.findMany({ isActive: true, take: 1000 }),
       AuditRepository.getLogs(),
     ]);
 
