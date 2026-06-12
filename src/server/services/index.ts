@@ -198,8 +198,8 @@ export const ProductService = {
     }
 
     const product = await ProductRepository.create({
-      categoryId: data.categoryId,
-      brandId: data.brandId ?? undefined,
+      category: { connect: { id: data.categoryId } },
+      ...(data.brandId ? { brand: { connect: { id: data.brandId } } } : {}),
       name: data.name,
       slug: data.slug,
       skuCode: data.skuCode,
