@@ -1,5 +1,5 @@
 import { db } from '../database/db';
-import { Prisma } from '@prisma/client';
+import { Prisma, OrderStatus } from '@prisma/client';
 
 // ─── USER REPOSITORY ─────────────────────────────────────────────────────────
 export const UserRepository = {
@@ -229,6 +229,17 @@ export const ProductRepository = {
     });
   },
 
+  /**
+   * Batch-fetch multiple SKUs in a single query.
+   * Use this in checkout to avoid N+1 queries when validating many items.
+   */
+  async findSkusByIds(skuIds: string[]) {
+    return db.productSKU.findMany({
+      where: { id: { in: skuIds } },
+      include: { inventory: true, product: true },
+    });
+  },
+
   async createSku(data: Prisma.ProductSKUCreateInput) {
     return db.productSKU.create({ data });
   },
@@ -305,6 +316,12 @@ export const CategoryRepository = {
   async findBySlug(slug: string) {
     return db.category.findFirst({
       where: { slug, deletedAt: null },
+    });
+  },
+
+  async findBySlugIncludingDeleted(slug: string) {
+    return db.category.findFirst({
+      where: { slug },
     });
   },
 
@@ -409,6 +426,17 @@ export const CartRepository = {
 };
 
 // ─── ORDER REPOSITORY ────────────────────────────────────────────────────────
+
+/**
+ * Represents a single line item validated and ready for insertion.
+ * All stock checks must have been completed before this type is used.
+ */
+export type ValidatedOrderItem = {
+  skuId: string;
+  quantity: number;
+  priceAtPurchase: number;
+};
+
 export const OrderRepository = {
   async findById(id: string) {
     return db.order.findUnique({
@@ -458,54 +486,130 @@ export const OrderRepository = {
     });
   },
 
-  async create(orderData: Prisma.OrderUncheckedCreateInput, items: Prisma.OrderItemUncheckedCreateWithoutOrderInput[]) {
-    return db.$transaction(async (tx) => {
-      // Create order
-      const order = await tx.order.create({
-        data: {
-          ...orderData,
-          items: {
-            create: items,
-          },
-        },
-      });
+  /**
+   * Create an order and atomically deduct inventory stock inside a single
+   * database transaction.
+   *
+   * ── Race-condition safety ──────────────────────────────────────────────────
+   * Stock validation is performed INSIDE the transaction using a raw
+   * `SELECT ... FOR UPDATE` lock on each inventory row.  This prevents two
+   * concurrent checkouts from both reading "stock = 1", both passing the check,
+   * and both decrementing the stock to -1 (overselling).
+   *
+   * The flow per SKU is:
+   *   1. Lock the inventory row with SELECT FOR UPDATE (no other transaction
+   *      can read or modify it until this transaction commits or rolls back).
+   *   2. Re-read the stock value from the locked row.
+   *   3. Assert stock >= requested quantity — throw if not.
+   *   4. Decrement atomically with `{ decrement: quantity }`.
+   *
+   * The database-level CHECK constraint `inventory_stock_non_negative` acts as
+   * a final safety net: even if application logic has a bug, the DB will reject
+   * any update that would make stock negative.
+   */
+  async create(
+    orderData: Prisma.OrderUncheckedCreateInput,
+    items: ValidatedOrderItem[]
+  ) {
+    return db.$transaction(
+      async (tx) => {
+        // ── Step 1: Lock all inventory rows we are about to touch ──────────
+        // Using $queryRaw for SELECT FOR UPDATE because Prisma does not expose
+        // this lock hint via the ORM API.
+        const skuIds = items.map((i) => i.skuId);
 
-      // Deduct stock and log movements
-      for (const item of items) {
-        const existing = await tx.inventory.findUnique({ where: { skuId: item.skuId } });
-        if (!existing || existing.stock < item.quantity) {
-          throw new Error(`Stok tidak mencukupi untuk SKU ID: ${item.skuId}`);
+        // Lock rows in a deterministic order (sorted IDs) to prevent deadlocks
+        // when two transactions touch overlapping SKU sets.
+        const sortedSkuIds = [...skuIds].sort();
+
+        const lockedRows = await tx.$queryRaw<Array<{ skuId: string; stock: number }>>`
+          SELECT "skuId", "stock"
+          FROM "Inventory"
+          WHERE "skuId" = ANY(${sortedSkuIds}::text[])
+          FOR UPDATE
+        `;
+
+        const stockMap = new Map(lockedRows.map((r) => [r.skuId, r.stock]));
+
+        // ── Step 2: Validate stock for every requested item ────────────────
+        for (const item of items) {
+          const availableStock = stockMap.get(item.skuId);
+
+          if (availableStock === undefined) {
+            throw new Error(
+              `Inventory tidak ditemukan untuk SKU ID: ${item.skuId}. ` +
+                'Pastikan SKU memiliki entri inventory.'
+            );
+          }
+
+          if (availableStock < item.quantity) {
+            throw new Error(
+              `Stok tidak mencukupi untuk SKU ID: ${item.skuId}. ` +
+                `Tersedia: ${availableStock}, diminta: ${item.quantity}.`
+            );
+          }
         }
 
-        await tx.inventory.update({
-          where: { skuId: item.skuId },
-          data: { stock: { decrement: item.quantity } },
-        });
-
-        await tx.inventoryMovement.create({
+        // ── Step 3: Create the order record ───────────────────────────────
+        const order = await tx.order.create({
           data: {
-            skuId: item.skuId,
-            quantity: -item.quantity,
-            type: 'PURCHASE',
-            note: `Pembelian dari Order #${order.id}`,
+            ...orderData,
+            items: {
+              create: items.map((item) => ({
+                skuId: item.skuId,
+                quantity: item.quantity,
+                priceAtPurchase: item.priceAtPurchase,
+              })),
+            },
           },
         });
-      }
 
-      return order;
-    });
+        // ── Step 4: Decrement stock atomically and log movements ───────────
+        // `{ decrement: quantity }` is a single atomic UPDATE … SET stock = stock - $1
+        // The database CHECK constraint is the final guarantee that stock never
+        // goes below 0 even if application logic has a bug.
+        for (const item of items) {
+          await tx.inventory.update({
+            where: { skuId: item.skuId },
+            data: { stock: { decrement: item.quantity } },
+          });
+
+          await tx.inventoryMovement.create({
+            data: {
+              skuId: item.skuId,
+              quantity: -item.quantity,
+              type: 'PURCHASE',
+              note: `Pembelian dari Order #${order.id}`,
+            },
+          });
+        }
+
+        return order;
+      },
+      {
+        // Use SERIALIZABLE isolation for the checkout transaction to give the
+        // strongest guarantee against phantom reads and write skews.
+        // Serializable may cause occasional "could not serialize access" errors
+        // under high contention — the caller should handle this with a retry.
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        // Generous timeout: 10 seconds covers slow DB connections while still
+        // preventing indefinite lock waits.
+        timeout: 10000,
+      }
+    );
   },
 
-  async updateStatus(id: string, status: any, note?: string) {
+  async updateStatus(id: string, status: OrderStatus, note?: string) {
     return db.$transaction(async (tx) => {
       const order = await tx.order.update({
         where: { id },
-        data: { status, notes: note ? note : undefined },
+        data: { status, notes: note ?? undefined },
       });
 
-      // If cancelled, restore inventory stock
+      // Restore inventory stock when an order is cancelled
       if (status === 'CANCELLED') {
         const orderItems = await tx.orderItem.findMany({ where: { orderId: id } });
+
         for (const item of orderItems) {
           await tx.inventory.upsert({
             where: { skuId: item.skuId },

@@ -7,6 +7,7 @@ import {
   OrderRepository,
   SettingRepository,
   AuditRepository,
+  ValidatedOrderItem,
 } from '../repositories';
 import {
   ValidationError,
@@ -18,6 +19,7 @@ import {
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { setAuthCookies, clearAuthCookies, TokenPayload } from '../auth/jwt';
 import { v2 as cloudinary } from 'cloudinary';
+import { OrderStatus } from '@prisma/client';
 
 // Cloudinary Configuration
 cloudinary.config({
@@ -325,8 +327,13 @@ export const CategoryService = {
   },
 
   async createCategory(adminId: string, data: any) {
-    const existing = await CategoryRepository.findBySlug(data.slug);
+    const existing = await CategoryRepository.findBySlugIncludingDeleted(data.slug);
     if (existing) {
+      if (existing.deletedAt) {
+        throw new ConflictError(
+          `Slug "${data.slug}" sudah digunakan oleh kategori yang dihapus "${existing.name}". Gunakan slug lain atau pulihkan kategori yang sudah ada.`
+        );
+      }
       throw new ConflictError('Slug kategori sudah digunakan');
     }
 
@@ -334,7 +341,6 @@ export const CategoryService = {
     await AuditRepository.log(adminId, 'CREATE', 'Category', category.id, { name: category.name });
     return category;
   },
-
   async updateCategory(adminId: string, id: string, data: any) {
     const category = await CategoryRepository.findById(id);
     if (!category) {
@@ -428,23 +434,57 @@ export const CartService = {
 
 // ─── ORDER SERVICE ───────────────────────────────────────────────────────────
 export const OrderService = {
+  /**
+   * Process a checkout request.
+   *
+   * ── Stock safety design ────────────────────────────────────────────────────
+   * We intentionally do NOT validate stock here in the service layer before
+   * calling OrderRepository.create().  The definitive stock check happens
+   * INSIDE the database transaction in OrderRepository.create() using
+   * SELECT FOR UPDATE row-level locks.
+   *
+   * Why?  A pre-check outside the transaction is always a TOCTOU (time-of-check
+   * / time-of-use) race: stock could change between the check and the deduction.
+   * The only correct place to check-and-deduct atomically is inside the same
+   * serializable transaction that holds the row lock.
+   *
+   * We still do a lightweight pre-flight here to:
+   *   a) resolve prices (requires a DB read anyway), and
+   *   b) give a fast, friendly error for obviously out-of-stock SKUs before
+   *      we even enter a transaction — this is a UX optimisation, not a
+   *      security/correctness guarantee.
+   */
   async checkout(userId: string, data: any) {
-    // 1. Calculate prices
+    // ── Step 1: Batch-fetch all requested SKUs in a single query ──────────
+    // Avoid N+1: do NOT fetch each SKU inside a loop.
+    const requestedSkuIds: string[] = data.items.map((i: any) => i.productSkuId as string);
+
+    const skus = await ProductRepository.findSkusByIds(requestedSkuIds);
+    const skuMap = new Map(skus.map((s) => [s.id, s]));
+
+    // ── Step 2: Build validated item list and compute subtotal ────────────
+    // This is a pre-flight price resolution — NOT the authoritative stock check.
     let subtotal = 0;
-    const itemsToCreate = [];
+    const itemsToCreate: ValidatedOrderItem[] = [];
 
     for (const item of data.items) {
-      const sku = await ProductRepository.findSkuById(item.productSkuId);
+      const sku = skuMap.get(item.productSkuId);
       if (!sku) {
-        throw new NotFoundError(`Varian SKU dengan ID ${item.productSkuId} tidak ditemukan`);
+        throw new NotFoundError(`Varian produk dengan ID "${item.productSkuId}" tidak ditemukan`);
       }
 
-      const stock = sku.inventory?.stock ?? 0;
-      if (stock < item.quantity) {
-        throw new ValidationError(`Stok tidak mencukupi untuk ${sku.product.name} (${sku.color}, ${sku.sizeEU})`);
+      // Fast pre-flight: if stock is obviously 0 right now, fail early.
+      // The authoritative check is inside the transaction.
+      const currentStock = sku.inventory?.stock ?? 0;
+      if (currentStock < item.quantity) {
+        throw new ValidationError(
+          `Stok tidak mencukupi untuk ${sku.product.name} — ` +
+            `warna ${sku.color}, ukuran EU ${sku.sizeEU}. ` +
+            `Tersedia: ${currentStock}, diminta: ${item.quantity}.`
+        );
       }
 
-      const price = sku.price || sku.product.basePrice;
+      const price = sku.price ?? sku.product.basePrice;
       subtotal += price * item.quantity;
 
       itemsToCreate.push({
@@ -454,23 +494,35 @@ export const OrderService = {
       });
     }
 
-    // Get flat shipping fee or read from dynamic settings
+    // ── Step 3: Resolve shipping fee ──────────────────────────────────────
     const shippingFeeSetting = await SettingRepository.get('shipping_fee');
-    const shippingFee = data.shippingType === 'DELIVERY' ? Number(shippingFeeSetting ?? 20000) : 0;
+    const shippingFee = data.shippingType === 'DELIVERY'
+      ? Number(shippingFeeSetting ?? 20000)
+      : 0;
     const totalPrice = subtotal + shippingFee;
 
-    // Address construction
+    // ── Step 4: Resolve shipping address ─────────────────────────────────
     let fullShippingAddress = data.shippingAddress || '';
     if (data.shippingAddressId) {
       const address = await AddressRepository.findById(data.shippingAddressId);
       if (address) {
-        fullShippingAddress = `${address.recipientName} (${address.phoneNumber}) - ${address.fullAddress}, ${address.district || ''}, ${address.city || ''}, ${address.province || ''} ${address.postalCode || ''}`;
+        fullShippingAddress = [
+          `${address.recipientName} (${address.phoneNumber})`,
+          address.fullAddress,
+          address.district,
+          address.city,
+          address.province,
+          address.postalCode,
+        ]
+          .filter(Boolean)
+          .join(', ');
       }
     }
 
-    // Payment expiry: 24 hours
-    const paymentExpiresAt = new Date();
-    paymentExpiresAt.setHours(paymentExpiresAt.getHours() + 24);
+    // ── Step 5: Create order atomically (stock deducted inside transaction) ─
+    // OrderRepository.create() uses SELECT FOR UPDATE + SERIALIZABLE isolation
+    // to prevent overselling even under concurrent load.
+    const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // +24 h
 
     const order = await OrderRepository.create(
       {
@@ -478,19 +530,19 @@ export const OrderService = {
         status: 'PENDING',
         shippingType: data.shippingType,
         shippingAddress: fullShippingAddress,
-        shippingDistrict: data.shippingDistrict || null,
+        shippingDistrict: data.shippingDistrict ?? null,
         shippingFee,
         shippingCost: shippingFee,
         subtotal,
         totalPrice,
         paymentMethod: data.paymentMethod,
         paymentExpiresAt,
-        notes: data.notes || '',
+        notes: data.notes ?? '',
       },
       itemsToCreate
     );
 
-    // Clear user cart if checkout is successful
+    // Clear the user's server-side cart after a successful checkout
     await CartService.clearCart(userId);
 
     return order;
@@ -532,7 +584,7 @@ export const OrderService = {
     return OrderRepository.uploadPaymentProof(orderId, result.secure_url);
   },
 
-  async updateOrderStatus(adminId: string, id: string, status: any, note?: string) {
+  async updateOrderStatus(adminId: string, id: string, status: OrderStatus, note?: string) {
     const order = await OrderRepository.findById(id);
     if (!order) {
       throw new NotFoundError('Order tidak ditemukan');

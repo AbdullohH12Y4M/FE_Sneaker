@@ -1,344 +1,366 @@
-P0.1 Business Rules
-Jenis marketplace atau single vendor
-B2C atau B2B
-Physical product atau digital product
-Alur fulfillment
-Alur retur
-Alur pembayaran
-Alur pengiriman
+# SneakerLocal (FE) — Dokumentasi Lengkap
 
-P0.2 Technical Foundation
-Repository Git
-Branch strategy
-CI/CD
-Environment management
-Database schema
-Logging strategy
-Error handling strategy
+Dokumentasi ini menjelaskan project FE: **struktur code**, **alur logic**, **alur user & admin**, **struktur project**, serta **seluruh endpoint API** yang ada pada backend Next.js (`src/app/api/**`).
 
-P0.3 Design System
-Color palette
-Typography
-Spacing system
-Border radius
-Shadow system
-Icon system
-Grid system
-Responsive breakpoint
+---
 
-PHASE 1 — Minimum Sellable Product
+## 1) Ringkasan Project
 
-Tujuan:
+Project adalah aplikasi e-commerce single-vendor untuk penjualan sepatu.
 
-User bisa membeli produk dan admin bisa mengelola produk.
+Komponen utama:
+- **Next.js App Router** (`src/app/**`) untuk halaman UI
+- **API routes** (`src/app/api/**/route.ts`) untuk backend
+- **Business logic** (`src/server/services/**`)
+- **Data access** (`src/server/repositories/**`)
+- **Auth** menggunakan cookie JWT (`src/server/auth/jwt.ts`) + middleware UI (`src/middleware.ts`)
+- **Database** menggunakan Prisma + PostgreSQL (`prisma/schema.prisma`)
 
-Homepage
-Header
-Logo
-Search input
-Cart icon
-Login button
-Hero
-Banner utama
-Product Section
-Product grid
-Product card
-Footer
-Copyright
-Contact
-Product Card
-Wajib
-Gambar
-Nama produk
-Harga
-Diskon
-Tombol detail
-Detail Kecil
-Hover shadow
-Hover scale ringan
-Loading skeleton
-Broken image fallback
-Image lazy loading
-Product Detail
-Wajib
-Gallery
-Nama
-Harga
-Deskripsi
-Stok
-Tombol Add to Cart
-Detail Kecil
-Thumbnail aktif
-Zoom image
-Loading state
-Error state
-Search
-Wajib
-Search by name
-Detail Kecil
-Debounce
-Empty state
-No result state
-Cart
-Wajib
-Tambah produk
-Hapus produk
-Ubah qty
-Hitung total
-Detail Kecil
-Cart badge
-Empty cart
-Quantity validation
-Checkout
-Wajib
-Alamat
-Pilih kurir
-Pilih pembayaran
-Buat order
-Detail Kecil
-Loading state
-Error state
-Disable double submit
-Authentication
-Wajib
-Register
-Login
-Logout
-Detail Kecil
-Password visibility toggle
-Email validation
-Password strength indicator
-Admin
-Product CRUD
-Create
-Read
-Update
-Delete
-Category CRUD
-Create
-Update
-Delete
-Order Management
-Lihat order
-Update status
-PHASE 2 — Production Ready
-UX
-Skeleton Loading
-Product card
-Product detail
-Cart
-Order
-Empty State
-Search kosong
-Cart kosong
-Wishlist kosong
-Error State
-404
-500
-Network error
-Success State
-Add to cart success
-Checkout success
-Responsive
-Mobile
-Bottom navigation
-Hamburger menu
-Tablet
-Adaptive grid
-Desktop
-Multi column
-Product
-Variants
-Size
-Color
-Material
-Gallery
-Multiple images
-Inventory
-Stock tracking
-User
-Profile
-Edit profile
-Address
-Multiple address
-Orders
-Order history
-Security
-Authentication
-JWT
-Refresh token
-Protection
-Rate limiting
-CSRF
-XSS protection
-Input sanitization
-SEO
-Technical SEO
-Sitemap
-Robots
-Metadata
-Product SEO
-Structured data
-PHASE 3 — Conversion Optimization
-Wishlist
-Add
-Remove
-Reviews
-Rating
-Text review
-Promotions
-Voucher
-Discount
-Recommendations
-Related products
-Analytics
-Google Analytics
-Event tracking
-PHASE 4 — Marketplace Features
+---
 
-Jika multi seller.
+## 2) Struktur Project (High-Level)
 
-Seller
-Seller registration
-Store profile
-Seller Dashboard
-Product management
-Order management
-Commission
-Commission calculation
-PHASE 5 — Advanced UX
-Search
-Autocomplete
-Search history
-Trending keywords
-Product Card
-Quick View
-Quick Add Cart
-Product Detail
-Recently viewed
-Related products
-PHASE 6 — Enterprise
-Notifications
-Email
-Push
-Marketing
-Campaign
-Flash sale
-Loyalty
-Points
-Membership
-AI
-Recommendations
-Search ranking
-Detail Kecil yang Sering Dilupakan (Tetapi Harus Ada Sejak Awal)
-Button States
+### 2.1 UI Routes
+- `src/app/layout.tsx` : root layout (Navbar, Footer, Providers)
+- `src/app/page.tsx` : homepage katalog + filter + fallback mock
+- Shop:
+  - `src/app/products/[slug]/page.tsx` : detail produk + varian + add-to-cart
+  - `src/app/categories/[id]/page.tsx` : detail kategori + grid produk
+  - `src/app/search/page.tsx` : search katalog via query params
+- User:
+  - `src/app/cart/page.tsx` : review & edit cart (Zustand)
+  - `src/app/checkout/page.tsx` : submit checkout ke backend
+  - `src/app/orders/page.tsx` : daftar order + upload proof + cancel
+  - `src/app/orders/[id]/page.tsx` : detail order + upload proof
+  - `src/app/profile/page.tsx` : edit profil & password opsional
+  - `src/app/login/page.tsx`, `src/app/register/page.tsx`
+- Admin:
+  - `src/app/admin/**` (dashboard & CRUD via UI)
 
-Setiap tombol memiliki:
+### 2.2 Komponen
+- `src/components/providers.tsx`
+- `src/components/layout/Navbar.tsx`, `Footer.tsx`
+- `src/components/shop/FilterSidebar.tsx`, `ProductCard.tsx`
+- `src/components/dev/DevMockBanner.tsx`
 
-Default
-Hover
-Focus
-Active
-Disabled
-Loading
-Input States
+### 2.3 Client State
+- `src/store/cart.ts` : cart state + persist localStorage
+- `src/store/shop.ts` : store produk/filter (sebagian mungkin kurang dipakai langsung)
 
-Setiap input memiliki:
+### 2.4 Backend API
+- `src/app/api/**/route.ts`
 
-Default
-Focus
-Error
-Success
-Disabled
-Product Image
-Lazy loading
-Blur placeholder
-Fallback image
-WebP support
-API
+---
 
-Setiap request memiliki:
+## 3) Database Schema (Prisma)
 
-Loading
-Success
-Error
-Retry
-Accessibility
-Alt image
-Keyboard navigation
-Focus ring
-ARIA label
-Frontend Components yang Wajib Ada Sejak Hari Pertama
-Button
-Input
-Textarea
-Select
-Checkbox
-Radio
-Switch
-Modal
-Drawer
-Dialog
-Dropdown
-Tooltip
-Popover
-Tabs
-Accordion
-Breadcrumb
-Pagination
-Skeleton
-Spinner
-Toast
-Alert
-ProductCard
-ProductGrid
-SearchBar
-Navbar
-Footer
+File: `prisma/schema.prisma`
 
+Model utama:
+- `User` (role CUSTOMER/ADMIN/STAFF)
+- `Address`
+- `Cart`, `CartItem`
+- `Product`, `ProductSKU`, `ProductImage`
+- `Inventory`, `InventoryMovement`
+- `Order`, `OrderItem`
+- `AppSetting` (mis. `shipping_fee`)
+- `AuditLog`
 
-[x] 1. Revamp Design System
-[x] Update globals.css with Warm Ember theme.
-[x] Update layout wrapper if necessary.
-[x] 2. Navigation & Header
-[x] Update Navbar.tsx (Logo, Search, Cart Badge).
-[x] 3. Homepage
-[x] Refactor page.tsx hero section and styling.
-[x] Update page.module.css.
-[x] 4. Product Card & Detail
-[x] Enhance ProductCard.tsx (hover effects, loading state).
-[x] Implement src/app/products/[id]/page.tsx.
-[x] 5. Cart & Checkout
-[x] Implement src/app/cart/page.tsx.
-[x] Implement src/app/checkout/page.tsx.
-[x] 6. Authentication
-[x] Revamp src/app/login/page.tsx.
-[x] Implement src/app/register/page.tsx (Combined with login).
-[x] 7. Admin Panel
-[x] Create src/app/admin/layout.tsx.
-[x] Implement Products CRUD page.
-[x] Implement Categories CRUD page.
-[x] Implement Orders page.
+Enums:
+- `Role`: CUSTOMER, ADMIN, STAFF
+- `OrderStatus`: PENDING, WAITING_CONFIRMATION, PAID, SHIPPED, DELIVERED, CANCELLED
+- `ShippingType`: DELIVERY, PICKUP
+- `PaymentMethod`: MANUAL_TRANSFER, MIDTRANS, COD
 
+---
 
+## 4) Auth & Authorization
 
-Phase 1 MVP & Design Revamp
-Apa yang telah diselesaikan?
-Sistem desain telah sepenuhnya direvamp menggunakan tema Warm Ember (Background gelap eksklusif #110d0c dengan Primary putih #ffffff). Komponen responsif dan interaksi mikro telah ditingkatkan agar terasa premium dan modern.
+### 4.1 Middleware UI: `src/middleware.ts`
+Melindungi route UI:
+- `/admin/*`:
+  - redirect ke `/login?callbackUrl=/admin` jika belum login
+  - redirect ke `/` jika bukan ADMIN
+- `/checkout`, `/orders`, `/profile`:
+  - redirect ke `/login?callbackUrl=<target>` jika belum login
+- `/login` dan `/register`:
+  - jika sudah login → redirect ke `/`
+- Allow public detail kategori:
+  - path start `/categories` tapi bukan `/categories`
 
-1. Desain Sistem & Homepage
-Warna & Typography: Mengganti palet warna di globals.css untuk menampilkan identitas Warm Ember.
-Hero & Banner: Menyesuaikan gradien, animasi hover, dan skala pada homepage.
-2. Produk & Detail
-Product Card: Menambahkan badge diskon, efek hover scale yang lembut, status stok, dan layout modern (src/components/shop/ProductCard.tsx).
-Product Detail: Menyempurnakan galeri gambar produk (thumbnail + fitur zoom), harga coret untuk diskon, dan seleksi ukuran/warna yang reaktif (src/app/products/[slug]/page.tsx).
-3. Keranjang & Checkout
-Keranjang (Cart): Menyesuaikan UI dengan tema baru. Logika validasi stok sudah tersambung (src/app/cart/page.tsx).
-Checkout: Menambahkan opsi metode pengiriman (DELIVERY/PICKUP) dan metode pembayaran. Memperbaiki shadow pada state active agar sesuai nuansa ember (src/app/checkout/page.tsx).
-4. Autentikasi
-Login & Register: Digabungkan dalam satu layout premium dengan toggle yang elegan.
-Fitur Baru: Menambahkan tombol visibilitas (Lihat/Sembunyikan) pada password, validasi email bawaan, dan indikator kekuatan password yang interaktif berdasarkan panjang dan kompleksitas (src/app/login/page.tsx).
-5. Admin Panel
-Layout Baru: Menambahkan AdminLayout dengan navigasi tab untuk memisahkan menu Pesanan dan Produk (src/app/admin/layout.tsx).
-Manajemen Pesanan: Membersihkan duplikasi layout di halaman pesanan (src/app/admin/page.tsx).
-CRUD Produk (MVP): Menambahkan form pembuatan produk dasar beserta tabel daftarnya (src/app/admin/products/page.tsx).
+### 4.2 JWT Cookie Auth: `src/server/auth/jwt.ts`
+- `access_token` expiry: 15 menit
+- `refresh_token` expiry: 7 hari
+- fungsi penting:
+  - `getAuthUser(req?)` (auto-refresh access token jika refresh valid)
+  - `setAuthCookies(payload)` (httpOnly cookies)
+  - `clearAuthCookies()`
+
+### 4.3 Helper Proteksi API: `src/lib/server-auth.ts`
+- `requireAuth(req)` → 401 jika tidak login
+- `requireAdmin(req)` → 401/403 sesuai role
+
+---
+
+## 5) Unified API Handler & Validasi
+
+File: `src/server/utils/route-handler.ts`
+
+Fitur:
+- Auth requirement (`requiredAuth`, `requiredRoles`)
+- Validasi JSON request dengan Zod (`options.schema`)
+- Unified success response:
+  - `{ success: true, message, data }`
+- Error mapping:
+  - Prisma unique/fk/notfound
+  - `handleApiError(error)` untuk format `{ success:false, message, errors? }`
+
+Zod schemas: `src/server/validators/schemas.ts`
+- `RegisterSchema`, `RegisterAdminSchema`
+- `LoginSchema`
+- `UpdateProfileSchema`
+- `CartItemSchema`
+- `CheckoutSchema`
+- `ProductSchema`, `ProductSkuSchema`
+- `CategorySchema`, `AddressSchema`
+
+---
+
+## 6) Logic Chain (End-to-End)
+
+### 6.1 Client → API (axios)
+File: `src/lib/api.ts`
+- mode mock: jika mock aktif panggil `mockHandlers.*`
+- interceptor request:
+  - dari browser ambil `localStorage.access_token`
+  - set header `Authorization: Bearer <token>`
+- interceptor response:
+  - jika 401 dan bukan mock → hapus token localStorage dan `signOut`
+
+### 6.2 API Route → Service → Repository → DB
+Pola umum:
+- route handler panggil `createHandler(...)` atau manual (untuk upload/multipart)
+- service menjalankan business rules
+- repository berinteraksi dengan Prisma (transaction jika perlu)
+
+Contoh paling penting sudah terdokumentasi dari:
+- `src/server/services/index.ts`
+- `src/server/repositories/index.ts`
+
+---
+
+## 7) User Flow (Customer)
+
+### 7.1 Register & Login
+- UI:
+  - `src/app/register/page.tsx`
+  - `src/app/login/page.tsx`
+- API:
+  - `POST /api/auth/register/customer`
+  - `POST /api/auth/login`
+
+### 7.2 Browsing & Filter
+- Homepage:
+  - `src/app/page.tsx`
+  - pakai `productsApi.listCatalog()` dan fallback mock
+- Search:
+  - `src/app/search/page.tsx`
+  - query params: `category,color,size,minPrice,maxPrice,search`
+- FilterSidebar:
+  - `src/components/shop/FilterSidebar.tsx`
+  - mengubah query params di URL
+
+### 7.3 Product detail & Add to Cart
+- `src/app/products/[slug]/page.tsx`
+- pilih warna, ukuran, qty
+- validasi stok di UI berdasarkan `selectedSku.stock`
+- add-to-cart: `useCartStore.addItem(...)`
+
+### 7.4 Cart → Checkout
+- Cart:
+  - `src/app/cart/page.tsx`
+  - edit qty + validasi maxStock
+- Checkout:
+  - `src/app/checkout/page.tsx`
+  - submit: `POST /api/checkout`
+
+### 7.5 Orders & Payment Proof
+- Orders list:
+  - `src/app/orders/page.tsx`
+  - upload proof via `POST /api/orders/[id]/payment-proof`
+  - cancel via `DELETE /api/orders/[id]` (status CANCELLED)
+- Orders detail:
+  - `src/app/orders/[id]/page.tsx`
+  - receipt & proof display
+
+---
+
+## 8) Admin Flow
+
+UI:
+- `src/app/admin/**`
+- middleware melindungi role ADMIN
+
+API penting:
+- `GET /api/admin/dashboard`
+- `Products CRUD` dan `SKUs/Inventories` via endpoint products/skus/inventories
+- `Order management`:
+  - `GET /api/orders/admin`
+  - `PATCH /api/orders/[id]/status` (ADMIN/STAFF)
+  - `GET /api/orders/admin/export`
+
+---
+
+## 9) Endpoint API — Detail Path, Auth, dan Body (yang terverifikasi)
+
+> Format respons cenderung mengikuti `createHandler`:
+> - success: `{ success:true, message, data }`
+> - error: `{ success:false, message, errors? }`
+> 
+> Untuk endpoint yang manual (upload/multipart), respons bisa berbeda.
+
+### 9.1 Auth
+- `POST /api/auth/login`
+- `POST /api/auth/logout` *(terlihat sebagai route `/api/auth/logout/route.ts` memakai `POST`)*
+- `GET /api/auth/me`
+- `PATCH /api/auth/profile`
+- `POST /api/auth/register/customer`
+- `POST /api/auth/register/admin`
+- `GET /api/auth/users` (admin only)
+
+### 9.2 Admin dashboard
+- `GET /api/admin/dashboard` (ADMIN/STAFF)
+
+### 9.3 Brands
+- `GET /api/brands` (public)
+  - query: `q`, `isActive`
+- `POST /api/brands` (ADMIN only)
+  - body: `{ name, slug, logoUrl? }`
+- `GET /api/brands/[id]` (public)
+- `PATCH /api/brands/[id]` (ADMIN)
+  - body: `{ name?, slug?, logoUrl?, isActive? }`
+- `DELETE /api/brands/[id]` (ADMIN)
+
+### 9.4 Categories
+- `GET /api/categories` (createHandler + filtering `isActive`)
+- `POST /api/categories` (ADMIN/STAFF)
+  - body: sesuai `CategorySchema`
+- `GET /api/categories/all` (public)
+- `GET /api/categories/[id]` (public)
+- `PATCH /api/categories/[id]` (ADMIN/STAFF)
+- `DELETE /api/categories/[id]` (ADMIN/STAFF)
+
+### 9.5 Products
+- `GET /api/products`
+  - query: `q`, `categorySlug`, `brandSlug`, `gender`, `isActive`, `page`, `limit`
+- `POST /api/products` (ADMIN/STAFF)
+  - body mode:
+    - SKU mode: `{ type:'SKU', productId, color, sizeEU, ... , initialStock?, price? }`
+    - Product mode: `{ categoryId, brandId?, name, slug, basePrice, ... }`
+- `GET /api/products/all` (public)
+- `GET /api/products/[slug]` (public)
+- `PATCH /api/products/[slug]` (ADMIN/STAFF)
+  - body: bebas update product field
+- `DELETE /api/products/[slug]` (ADMIN/STAFF)
+- `POST /api/products/[slug]/image` (ADMIN)
+  - multipart form-data:
+    - file: `file`
+    - isPrimary: `isPrimary` (optional)
+- `DELETE /api/products/[slug]/image?imageId=` (ADMIN)
+
+### 9.6 SKUs
+- `PATCH /api/skus/[id]` (ADMIN)
+- `DELETE /api/skus/[id]` (ADMIN)
+
+### 9.7 Inventories (stock)
+- `PATCH /api/inventories/[skuId]` (ADMIN)
+  - body: `{ type:'STOCK'?, stock }`
+
+### 9.8 Cart
+- `GET /api/cart` (auth)
+- `POST /api/cart` (auth)
+  - body: `{ productSkuId, quantity }`
+- `PATCH /api/cart/[id]` (auth)
+  - body: `{ quantity }`
+- `DELETE /api/cart/[id]` (auth)
+
+### 9.9 Checkout
+- `POST /api/checkout` (auth)
+  - body: sesuai `CheckoutSchema`
+
+### 9.10 Orders
+- `GET /api/orders` (auth)
+- `GET /api/orders/[id]` (auth)
+- `DELETE /api/orders/[id]` (auth)
+- `POST /api/orders/[id]/payment-proof` (auth, multipart file)
+- `GET /api/orders/[id]/receipt` (auth) → response text/plain attachment
+- `PATCH /api/orders/[id]/status` (ADMIN/STAFF)
+
+### 9.11 Admin Orders
+- `GET /api/orders/admin` (ADMIN/STAFF)
+- `GET /api/orders/admin/export` (ADMIN only)
+  - query: `format=csv|json`, `status`, `startDate`, `endDate`
+
+### 9.12 Upload
+- `POST /api/upload` (ADMIN/STAFF)
+  - multipart form-data: `file`
+
+### 9.13 Users
+- `GET/PATCH /api/users/profile` (auth)
+
+---
+
+## 10) Komponen UI yang Mempengaruhi Flow Utama
+
+### 10.1 `FilterSidebar`
+- Mengubah URL query params untuk filter katalog
+
+### 10.2 `ProductCard`
+- Menampilkan label sold out/discount
+- swatch warna dari sku
+- tombol navigasi ke detail
+
+### 10.3 `CartStore`
+- persist cart ke localStorage (`zustand persist`)
+- merge dengan server cart tersedia (`mergeWithServerCart`) meski belum terlihat penggunaannya langsung di pages customer.
+
+---
+
+## 11) Catatan Kualitas / Perbaikan Potensial
+
+- `src/store/shop.ts` ada fungsi `fetchProducts` tapi kemungkinan tidak dipakai karena pages sudah fetch sendiri.
+  - ada TODO cleanup di `TODO.md`.
+- Review pada `ProductDetailPage` masih mock.
+
+---
+
+## 12) Referensi File Penting
+
+- Auth UI: 
+  - `src/app/login/page.tsx`
+  - `src/app/register/page.tsx`
+- Root layout:
+  - `src/app/layout.tsx`
+- Providers:
+  - `src/components/providers.tsx`
+- Middleware:
+  - `src/middleware.ts`
+- Auth JWT:
+  - `src/server/auth/jwt.ts`
+- Unified handler:
+  - `src/server/utils/route-handler.ts`
+- Services/Repositories:
+  - `src/server/services/index.ts`
+  - `src/server/repositories/index.ts`
+- DB schema:
+  - `prisma/schema.prisma`
+
+---
+
+## 13) Cara Jalankan (umum)
+
+- Pastikan environment variables untuk database & JWT secret sudah diset.
+- Prisma generate/seed sesuai package.json.
+
+(Detail command dijelaskan di file project (mis. README root/konfig), dan bisa ditambahkan bila kamu ingin.)
+
