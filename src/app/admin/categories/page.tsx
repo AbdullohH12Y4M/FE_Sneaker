@@ -19,19 +19,34 @@ export default function AdminCategoriesPage() {
     isActive: true,
   });
 
+
   const fetchCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await categoriesApi.listAll();
-      const data = response.data as Category[];
-      setCategories(Array.isArray(data) ? data : []);
-      setError('');
-    } catch (err: unknown) {
-      setError(extractErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  try {
+    setLoading(true);
+    const response = await categoriesApi.listAll();
+    const data = response.data as { items?: Category[] } | Category[];
+    setCategories(Array.isArray(data) ? data : (data as { items?: Category[] }).items ?? []);
+    setError('');
+  } catch (err: unknown) {
+    setError(extractErrorMessage(err));
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+  // const fetchCategories = useCallback(async () => {
+  //   try {
+  //     setLoading(true);
+  //     const response = await categoriesApi.listAll();
+  //     const data = response.data as Category[];
+  //     setCategories(Array.isArray(data) ? data : []);
+  //     setError('');
+  //   } catch (err: unknown) {
+  //     setError(extractErrorMessage(err));
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, []);
 
   useEffect(() => {
     fetchCategories();

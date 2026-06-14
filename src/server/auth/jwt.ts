@@ -17,13 +17,16 @@ import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import { UnauthorizedError } from '../errors';
 
-// ─── Secret resolution — fail fast on misconfiguration ───────────────────────
+// ─── Secret resolution — deferred to first use ───────────────────────────────
+// NOTE: We intentionally do NOT resolve the secret at module load time.
+// Next.js evaluates server modules during `next build` in a context where
+// runtime env vars (JWT_SECRET) may not be present, causing the build to fail.
+// Instead, we resolve lazily inside each function call so the error only
+// surfaces at request time, not at build time.
 function resolveSecret(): Uint8Array {
   const raw = process.env.JWT_SECRET;
 
   if (!raw || raw.trim() === '') {
-    // Throw at module initialisation time so the error surfaces immediately
-    // during `next dev` or `next start`, not buried inside a request handler.
     throw new Error(
       '[jwt] JWT_SECRET environment variable is not set. ' +
         'Set a strong random secret (≥32 chars) in your .env file and restart the server. ' +
@@ -32,8 +35,6 @@ function resolveSecret(): Uint8Array {
   }
 
   if (raw.length < 32) {
-    // Warn but do not hard-block — allows short secrets in test environments
-    // while making the issue visible in logs.
     console.warn(
       '[jwt] WARNING: JWT_SECRET is shorter than 32 characters. ' +
         'Use a longer random value in production.'
@@ -42,9 +43,6 @@ function resolveSecret(): Uint8Array {
 
   return new TextEncoder().encode(raw);
 }
-
-// Evaluated once at module load time — throws immediately if misconfigured.
-const SECRET: Uint8Array = resolveSecret();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type TokenPayload = {
@@ -67,7 +65,7 @@ export async function signAccessToken(payload: TokenPayload): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(ACCESS_TOKEN_EXPIRY)
-    .sign(SECRET);
+    .sign(resolveSecret());
 }
 
 export async function signRefreshToken(payload: TokenPayload): Promise<string> {
@@ -75,7 +73,7 @@ export async function signRefreshToken(payload: TokenPayload): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(REFRESH_TOKEN_EXPIRY)
-    .sign(SECRET);
+    .sign(resolveSecret());
 }
 
 // ─── Verification ─────────────────────────────────────────────────────────────
@@ -86,7 +84,7 @@ export async function signRefreshToken(payload: TokenPayload): Promise<string> {
  */
 export async function verifyToken(token: string): Promise<TokenPayload> {
   try {
-    const { payload } = await jwtVerify(token, SECRET, {
+    const { payload } = await jwtVerify(token, resolveSecret(), {
       algorithms: ['HS256'],
     });
 
