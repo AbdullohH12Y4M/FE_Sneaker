@@ -1,22 +1,19 @@
 'use client';
 
-import { SessionProvider, useSession } from 'next-auth/react';
+import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Session } from 'next-auth';
 
-function AuthTokenSync() {
-  const { data: session } = useSession();
-
-  useEffect(() => {
-    const token = session?.user?.accessToken;
-    if (token) {
-      localStorage.setItem('access_token', token);
-    }
-  }, [session?.user?.accessToken]);
-
-  return null;
-}
+/**
+ * Application providers.
+ *
+ * NOTE: The previous AuthTokenSync component that copied session.user.accessToken
+ * into localStorage has been removed. Storing tokens in localStorage exposes
+ * them to XSS attacks. Auth tokens are now managed exclusively via HttpOnly
+ * cookies (access_token / refresh_token) set server-side by our custom JWT
+ * system. The Axios interceptor in lib/api.ts has also been updated accordingly.
+ */
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -39,7 +36,6 @@ export function Providers({ children, session }: ProvidersProps) {
   return (
     <SessionProvider session={session}>
       <QueryClientProvider client={queryClient}>
-        <AuthTokenSync />
         {children}
       </QueryClientProvider>
     </SessionProvider>

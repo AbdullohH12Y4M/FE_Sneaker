@@ -1,18 +1,29 @@
+/**
+ * NextAuth v5 configuration — Credentials-only, JWT strategy.
+ *
+ * ── Why no PrismaAdapter? ──────────────────────────────────────────────────
+ * PrismaAdapter requires additional tables (Account, Session, VerificationToken)
+ * that are not in our schema. Since we use JWT strategy (stateless sessions),
+ * the adapter is not needed. Our custom JWT system (src/server/auth/jwt.ts)
+ * handles access/refresh cookies for API routes independently.
+ *
+ * ── Auth flow ──────────────────────────────────────────────────────────────
+ * 1. User submits email + password on /login
+ * 2. NextAuth Credentials.authorize() verifies against DB
+ * 3. On success: jwt() callback embeds id, role into the NextAuth JWT
+ * 4. session() callback exposes id, role on the client-side session object
+ * 5. Simultaneously, /api/auth/login issues HttpOnly access_token + refresh_token
+ *    cookies via our custom JWT system — these are used by all API route handlers
+ */
 import NextAuth from 'next-auth';
-import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import type { NextAuthConfig } from 'next-auth';
-import { PrismaAdapter } from '@auth/prisma-adapter';
 import prisma from './prisma';
 import { verifyPassword } from './password';
 
 export const authConfig: NextAuthConfig = {
-  adapter: PrismaAdapter(prisma),
+  // No adapter — pure JWT strategy, no DB session storage needed
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
     Credentials({
       name: 'credentials',
       credentials: {
@@ -23,55 +34,66 @@ export const authConfig: NextAuthConfig = {
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { email: String(credentials.email) },
+          const user = await prisma.user.findFirst({
+            where: {
+              email: String(credentials.email),
+              deletedAt: null,
+            },
           });
 
           if (!user) return null;
 
-          const valid = await verifyPassword(String(credentials.password), user.password);
+          const valid = await verifyPassword(
+            String(credentials.password),
+            user.password
+          );
           if (!valid) return null;
 
+          // Return shape — kept minimal. id/role are embedded in the JWT token
+          // by the jwt() callback below.
           return {
             id: user.id,
             name: user.name ?? user.email.split('@')[0],
             email: user.email,
-            role: user.role,
-            accessToken: 'session',
+            role: user.role as string,
           };
         } catch (error) {
-          console.error('❌ [Auth-Authorize] Login error:', error);
+          console.error('[NextAuth] authorize error:', error);
           return null;
         }
       },
     }),
   ],
+
   callbacks: {
     async jwt({ token, user }) {
+      // `user` is only present on the first sign-in
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? 'CUSTOMER';
-        token.accessToken = (user as { accessToken?: string }).accessToken;
       }
       return token;
     },
+
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.accessToken = token.accessToken as string;
+        session.user.role = (token.role as string) ?? 'CUSTOMER';
       }
       return session;
     },
   },
+
   pages: {
     signIn: '/login',
     error: '/login',
   },
+
   session: {
     strategy: 'jwt',
-    maxAge: 7 * 24 * 60 * 60, // 7 hari
+    maxAge: 7 * 24 * 60 * 60, // 7 days — matches refresh token lifetime
   },
+
   secret: process.env.NEXTAUTH_SECRET,
 };
 

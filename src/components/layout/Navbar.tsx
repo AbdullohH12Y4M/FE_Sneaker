@@ -216,7 +216,19 @@ export default function Navbar() {
                       <hr className="divider" />
                       <button
                         className={`${styles.dropdownItem} ${styles.dropdownItemDanger}`}
-                        onClick={() => { localStorage.removeItem('access_token'); signOut({ callbackUrl: '/' }); setUserMenuOpen(false); }}
+                        onClick={async () => {
+                          setUserMenuOpen(false);
+                          // Step 1: Clear HttpOnly access_token + refresh_token cookies
+                          // via our custom logout endpoint. This must happen before
+                          // signOut() so the cookies are gone before the page reloads.
+                          try {
+                            await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                          } catch {
+                            // Best-effort — even if this fails, we still sign out of NextAuth
+                          }
+                          // Step 2: Destroy the NextAuth session cookie
+                          signOut({ callbackUrl: '/' });
+                        }}
                       >
                         <FiLogOut size={16} /> Keluar
                       </button>
@@ -274,7 +286,15 @@ export default function Navbar() {
                   )}
                   <button
                     className={`${styles.mobileLink} ${styles.dropdownItemDanger}`}
-                    onClick={() => { localStorage.removeItem('access_token'); signOut({ callbackUrl: '/' }); setMobileOpen(false); }}
+                    onClick={async () => {
+                      setMobileOpen(false);
+                      try {
+                        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                      } catch {
+                        // Best-effort
+                      }
+                      signOut({ callbackUrl: '/' });
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', border: 'none', background: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
                   >
                     <FiLogOut size={16} /> Keluar
