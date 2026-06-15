@@ -166,6 +166,38 @@ export default function AdminPage() {
                   <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '4px' }}>
                     {order.user?.email ?? order.userId} • {ORDER_STATUS_LABELS[order.status] ?? order.status} • {order.items.length} item • {new Date(order.createdAt).toLocaleDateString('id-ID')} • {formatPrice(order.totalPrice)}
                   </p>
+
+                  {/* Payment proof thumbnail — visible when proof uploaded */}
+                  {order.paymentProofUrl && (
+                    <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <a href={order.paymentProofUrl} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={order.paymentProofUrl}
+                          alt="Bukti transfer"
+                          style={{
+                            width: '64px',
+                            height: '64px',
+                            objectFit: 'cover',
+                            borderRadius: '6px',
+                            border: '2px solid var(--color-border)',
+                          }}
+                        />
+                      </a>
+                      <div>
+                        <p style={{ fontSize: '0.8rem', fontWeight: 500, marginBottom: 2 }}>Bukti Transfer</p>
+                        <a
+                          href={order.paymentProofUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                        >
+                          Lihat
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className={styles.orderActions} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {ORDER_STATUSES.map((status) => (

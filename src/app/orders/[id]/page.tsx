@@ -146,7 +146,61 @@ export default function OrderDetailPage() {
           ))}
         </section>
 
-        {order.status === 'PAID' && (
+        {/* Payment proof — displayed for all statuses when proof exists */}
+        {order.paymentProofUrl && (
+          <section className="card" style={{ padding: 24 }}>
+            <h2>Bukti Pembayaran</h2>
+
+            {/* Thumbnail preview */}
+            <a href={order.paymentProofUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginBottom: 12 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={order.paymentProofUrl}
+                alt="Bukti pembayaran"
+                style={{
+                  width: '180px',
+                  height: '180px',
+                  objectFit: 'cover',
+                  borderRadius: '10px',
+                  border: '2px solid var(--color-border)',
+                  display: 'block',
+                }}
+              />
+            </a>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+              <a
+                href={order.paymentProofUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-secondary btn-sm"
+              >
+                Lihat Ukuran Penuh
+              </a>
+              <a
+                href={order.paymentProofUrl}
+                download
+                className="btn btn-ghost btn-sm"
+              >
+                Unduh
+              </a>
+            </div>
+
+            {/* Status info below the proof */}
+            {order.status === 'WAITING_CONFIRMATION' && (
+              <p className="text-muted" style={{ fontSize: '0.875rem' }}>
+                ⏳ Menunggu verifikasi admin
+              </p>
+            )}
+            {order.status === 'PAID' && (
+              <p style={{ color: 'var(--color-success)', fontSize: '0.875rem', fontWeight: 500 }}>
+                ✓ Pembayaran telah diverifikasi
+              </p>
+            )}
+          </section>
+        )}
+
+        {order.status === 'PAID' && !order.paymentProofUrl && (
           <section className="card" style={{ padding: 24, borderLeft: '4px solid var(--color-success)' }}>
             <p className="font-medium" style={{ color: 'var(--color-success)' }}>✓ Pembayaran sudah diverifikasi</p>
           </section>
@@ -154,10 +208,10 @@ export default function OrderDetailPage() {
 
         {canUploadProof && (
           <section className="card" style={{ padding: 24 }}>
-            <h2>{order.status === 'WAITING_CONFIRMATION' ? 'Ganti Bukti Pembayaran' : 'Bukti Pembayaran'}</h2>
+            <h2>{order.status === 'WAITING_CONFIRMATION' ? 'Ganti Bukti Pembayaran' : 'Upload Bukti Pembayaran'}</h2>
             {order.status === 'WAITING_CONFIRMATION' && (
               <p className="text-muted" style={{ marginBottom: 12 }}>
-                Bukti pembayaran sedang diverifikasi admin. Upload baru akan menggantikan bukti sebelumnya.
+                Upload baru akan menggantikan bukti sebelumnya.
               </p>
             )}
             <label className="btn btn-primary btn-sm" htmlFor={`proof-${order.id}`}>
@@ -184,20 +238,6 @@ export default function OrderDetailPage() {
                 placeholder="Transfer via BCA a/n Budi"
               />
             </div>
-          </section>
-        )}
-
-        {order.paymentProofUrl && (
-          <section className="card" style={{ padding: 24 }}>
-            <h2>Bukti Pembayaran</h2>
-            <a
-              href={order.paymentProofUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-secondary btn-sm"
-            >
-              Lihat Bukti Transfer
-            </a>
           </section>
         )}
       </div>

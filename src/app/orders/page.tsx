@@ -148,21 +148,42 @@ export default function OrdersPage() {
                 </div>
               ))}
 
-              {order.status === 'PENDING' && (
+              {/* Payment proof section — shown for relevant statuses */}
+              {(order.status === 'PENDING' || order.status === 'WAITING_CONFIRMATION') && (
                 <div className={styles.paymentBox}>
-                  {order.paymentProofUrl ? (
-                    <div>
-                      <p className="font-medium">Bukti Transfer</p>
+                  {/* Show existing proof thumbnail if already uploaded */}
+                  {order.paymentProofUrl && (
+                    <div style={{ marginBottom: 12 }}>
+                      <p className="font-medium" style={{ marginBottom: 8 }}>Bukti Transfer Terunggah:</p>
+                      <a href={order.paymentProofUrl} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={order.paymentProofUrl}
+                          alt="Bukti transfer"
+                          style={{
+                            width: '120px',
+                            height: '120px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            border: '2px solid var(--color-border)',
+                            display: 'block',
+                            marginBottom: 6,
+                          }}
+                        />
+                      </a>
                       <a
                         href={order.paymentProofUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-secondary btn-sm"
                       >
-                        Lihat Bukti
+                        Lihat Ukuran Penuh
                       </a>
                     </div>
-                  ) : (
+                  )}
+
+                  {/* Upload / re-upload button */}
+                  {!order.paymentProofUrl ? (
                     <>
                       <label className="btn btn-primary btn-sm" htmlFor={`proof-${order.id}`}>
                         {uploadingOrder === order.id ? 'Mengunggah...' : 'Unggah Bukti Transfer'}
@@ -177,7 +198,6 @@ export default function OrdersPage() {
                           }}
                         />
                       </label>
-
                       <div style={{ marginTop: 10 }}>
                         <label className="form-label" htmlFor={`note-${order.id}`}>
                           Catatan Tambahan (Opsional)
@@ -188,15 +208,33 @@ export default function OrdersPage() {
                           rows={2}
                           value={noteByOrderId[order.id] ?? ''}
                           onChange={(e) =>
-                            setNoteByOrderId((prev) => ({
-                              ...prev,
-                              [order.id]: e.target.value,
-                            }))
+                            setNoteByOrderId((prev) => ({ ...prev, [order.id]: e.target.value }))
                           }
                           placeholder="Transfer via BCA a/n Budi"
                         />
                       </div>
                     </>
+                  ) : order.status === 'WAITING_CONFIRMATION' ? (
+                    /* Allow re-upload when WAITING_CONFIRMATION */
+                    <label className="btn btn-secondary btn-sm" htmlFor={`proof-replace-${order.id}`} style={{ marginTop: 8 }}>
+                      {uploadingOrder === order.id ? 'Mengunggah...' : 'Ganti Bukti Transfer'}
+                      <input
+                        id={`proof-replace-${order.id}`}
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) handleUpload(order.id, file);
+                        }}
+                      />
+                    </label>
+                  ) : null}
+
+                  {order.status === 'WAITING_CONFIRMATION' && (
+                    <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 8 }}>
+                      ⏳ Menunggu verifikasi admin
+                    </p>
                   )}
                 </div>
               )}
