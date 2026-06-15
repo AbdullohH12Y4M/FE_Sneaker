@@ -31,6 +31,13 @@ export default function AdminProductEditPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  // ─── Inline SKU edit state ───────────────────────────────────────────────
+  const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
+  const [skuEditForm, setSkuEditForm] = useState<{
+    color: string; colorHex: string; sizeEU: string;
+    sizeUS: string; sizeUK: string; sizeCM: string; price: string; stock: string;
+  }>({ color: '', colorHex: '#888888', sizeEU: '', sizeUS: '', sizeUK: '', sizeCM: '', price: '', stock: '' });
+
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -83,7 +90,11 @@ export default function AdminProductEditPage() {
               sizeUS: (s as unknown as Record<string, unknown>).sizeUS ? String((s as unknown as Record<string, unknown>).sizeUS) : undefined,
               sizeUK: (s as unknown as Record<string, unknown>).sizeUK ? String((s as unknown as Record<string, unknown>).sizeUK) : undefined,
               sizeCM: (s as unknown as Record<string, unknown>).sizeCM != null ? Number((s as unknown as Record<string, unknown>).sizeCM) : undefined,
-              stock: Number((s as unknown as Record<string, unknown>).stock ?? 0),
+              stock: Number(
+                  (s as unknown as Record<string, unknown>).stock !== undefined
+                    ? (s as unknown as Record<string, unknown>).stock
+                    : ((s as unknown as Record<string, unknown>).inventory as { stock?: number } | undefined)?.stock ?? 0
+                ),
               price: (s as unknown as Record<string, unknown>).price != null ? Number((s as unknown as Record<string, unknown>).price) : undefined,
             }))
           : [],
@@ -144,6 +155,7 @@ export default function AdminProductEditPage() {
         brandId: formData.brandId || undefined,
       });
       setSuccess('Produk berhasil diperbarui.');
+      setTimeout(() => setSuccess(''), 4000);
       await fetchProduct();
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
@@ -159,6 +171,7 @@ export default function AdminProductEditPage() {
     try {
       await productsApi.uploadImage(productId, imageFile, false);
       setSuccess('Gambar produk berhasil diunggah.');
+      setTimeout(() => setSuccess(''), 4000);
       setImageFile(null);
       await fetchProduct();
     } catch (err: unknown) {
@@ -181,6 +194,59 @@ export default function AdminProductEditPage() {
       const img = (raw.images ?? []).find((i) => i.url === imageUrl);
       if (!img) return;
       await productsApi.deleteImage(productId, img.id);
+      await fetchProduct();
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    }
+  };
+
+  // ─── Inline SKU handlers ─────────────────────────────────────────────────
+
+  const handleEditSku = (sku: ProductSKU) => {
+    setEditingSkuId(sku.id);
+    setSkuEditForm({
+      color: sku.color,
+      colorHex: sku.colorHex || '#888888',
+      sizeEU: String(sku.sizeEU),
+      sizeUS: sku.sizeUS ?? '',
+      sizeUK: sku.sizeUK ?? '',
+      sizeCM: sku.sizeCM ? String(sku.sizeCM) : '',
+      price: sku.price ? String(sku.price) : '',
+      stock: String(sku.stock),
+    });
+  };
+
+  const handleSaveSku = async (skuId: string) => {
+    setSaving(true);
+    setError('');
+    try {
+      await productsApi.updateSku(skuId, {
+        color: skuEditForm.color,
+        colorHex: skuEditForm.colorHex,
+        sizeEU: Number(skuEditForm.sizeEU),
+        sizeUS: skuEditForm.sizeUS || undefined,
+        sizeUK: skuEditForm.sizeUK || undefined,
+        sizeCM: skuEditForm.sizeCM ? Number(skuEditForm.sizeCM) : undefined,
+        price: skuEditForm.price ? Number(skuEditForm.price) : undefined,
+      });
+      await productsApi.updateStock(skuId, { type: 'STOCK', stock: Number(skuEditForm.stock) });
+      setEditingSkuId(null);
+      setSuccess('SKU berhasil diperbarui.');
+      setTimeout(() => setSuccess(''), 4000);
+      await fetchProduct();
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSku = async (skuId: string) => {
+    if (!confirm('Hapus varian SKU ini? Stok akan ikut terhapus.')) return;
+    try {
+      await productsApi.deleteSku(skuId);
+      setSuccess('SKU berhasil dihapus.');
+      setTimeout(() => setSuccess(''), 4000);
       await fetchProduct();
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
@@ -435,32 +501,169 @@ export default function AdminProductEditPage() {
                     <th style={{ padding: '12px', fontWeight: 600 }}>CM</th>
                     <th style={{ padding: '12px', fontWeight: 600 }}>Stok</th>
                     <th style={{ padding: '12px', fontWeight: 600 }}>Harga</th>
+                    <th style={{ padding: '12px', fontWeight: 600 }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {product.skus.map((sku: ProductSKU) => (
-                    <tr key={sku.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: sku.colorHex || '#888', border: '1px solid var(--color-border)' }} />
-                          {sku.color}
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px' }}>{sku.sizeEU}</td>
-                      <td style={{ padding: '12px', fontSize: '0.85rem' }}>{sku.sizeUS ?? '—'} / {sku.sizeUK ?? '—'}</td>
-                      <td style={{ padding: '12px' }}>{sku.sizeCM ?? '—'}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span className={`badge ${sku.stock > 0 ? 'badge-success' : 'badge-danger'}`}>{sku.stock}</span>
-                      </td>
-                      <td style={{ padding: '12px' }}>{formatPrice(sku.price ?? product.basePrice)}</td>
-                    </tr>
+                    <>
+                      <tr key={sku.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: sku.colorHex || '#888', border: '1px solid var(--color-border)' }} />
+                            {sku.color}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px' }}>{sku.sizeEU}</td>
+                        <td style={{ padding: '12px', fontSize: '0.85rem' }}>{sku.sizeUS ?? '—'} / {sku.sizeUK ?? '—'}</td>
+                        <td style={{ padding: '12px' }}>{sku.sizeCM ?? '—'}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span className={`badge ${sku.stock > 0 ? 'badge-success' : 'badge-danger'}`}>{sku.stock}</span>
+                        </td>
+                        <td style={{ padding: '12px' }}>{formatPrice(sku.price ?? product.basePrice)}</td>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              onClick={() => handleEditSku(sku)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              type="button"
+                              onClick={() => handleDeleteSku(sku.id)}
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Inline edit row */}
+                      {editingSkuId === sku.id && (
+                        <tr key={`${sku.id}-edit`} style={{ background: 'var(--color-surface-2)' }}>
+                          <td colSpan={7} style={{ padding: '16px' }}>
+                            <div className="card" style={{ padding: '16px', display: 'grid', gap: '12px' }}>
+                              <h4 style={{ margin: 0 }}>Edit SKU</h4>
+
+                              {/* Color + ColorHex */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
+                                <div>
+                                  <label className="form-label">Warna *</label>
+                                  <input
+                                    className="form-input"
+                                    value={skuEditForm.color}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, color: e.target.value })}
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <input
+                                    type="color"
+                                    value={skuEditForm.colorHex}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, colorHex: e.target.value })}
+                                    style={{ width: '40px', height: '40px', border: 'none', cursor: 'pointer' }}
+                                  />
+                                  <input
+                                    className="form-input"
+                                    value={skuEditForm.colorHex}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, colorHex: e.target.value })}
+                                    style={{ width: '100px' }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Sizes */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
+                                <div>
+                                  <label className="form-label">EU *</label>
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    className="form-input"
+                                    value={skuEditForm.sizeEU}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, sizeEU: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label">US</label>
+                                  <input
+                                    className="form-input"
+                                    value={skuEditForm.sizeUS}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, sizeUS: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label">UK</label>
+                                  <input
+                                    className="form-input"
+                                    value={skuEditForm.sizeUK}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, sizeUK: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label">CM</label>
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    className="form-input"
+                                    value={skuEditForm.sizeCM}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, sizeCM: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Price + Stock */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                  <label className="form-label">Harga Override (Rp)</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    value={skuEditForm.price}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, price: e.target.value })}
+                                    placeholder="Kosong = pakai base price"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label">Stok *</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    min="0"
+                                    value={skuEditForm.stock}
+                                    onChange={(e) => setSkuEditForm({ ...skuEditForm, stock: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  disabled={saving}
+                                  onClick={() => handleSaveSku(sku.id)}
+                                >
+                                  {saving ? 'Menyimpan...' : 'Simpan SKU'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => setEditingSkuId(null)}
+                                >
+                                  Batal
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="text-muted" style={{ marginTop: '8px', fontSize: '0.875rem' }}>
-              Untuk edit SKU, gunakan menu <strong>Manajemen SKU</strong> di sidebar.
-            </p>
           </div>
         )}
       </div>

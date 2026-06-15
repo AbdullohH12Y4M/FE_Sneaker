@@ -130,6 +130,13 @@ export default function ProductDetailPage() {
               ? (data.category.name ?? data.category.slug ?? 'Uncategorized')
               : (data.category || 'Uncategorized'),
           images: data.images?.length ? data.images : ['/placeholder-shoes.png'],
+          // Normalize SKUs: flatten inventory.stock → stock
+          skus: (data.skus ?? []).map((sku: any) => ({
+            ...sku,
+            stock: typeof sku.stock === 'number'
+              ? sku.stock
+              : (sku.inventory?.stock ?? 0),
+          })),
         };
         setProduct(normalized);
         setActiveImage(normalized.images[0]);
