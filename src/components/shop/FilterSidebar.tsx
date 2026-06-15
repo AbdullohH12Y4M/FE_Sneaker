@@ -7,19 +7,11 @@ import styles from './FilterSidebar.module.css';
 
 interface FilterSidebarProps {
   categories: string[];
+  /** Warna unik dari produk server — jika tidak diberikan, kosong */
+  colors?: { name: string; hex: string }[];
+  /** Ukuran EU unik dari produk server */
+  sizes?: number[];
 }
-
-const SHOE_SIZES = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45];
-const COLORS = [
-  { name: 'Hitam', hex: '#1a1a1a' },
-  { name: 'Putih', hex: '#f0f0f0' },
-  { name: 'Merah', hex: '#ef4444' },
-  { name: 'Navy', hex: '#1e3a5f' },
-  { name: 'Abu', hex: '#6b7280' },
-  { name: 'Coklat', hex: '#92400e' },
-  { name: 'Hijau', hex: '#16a34a' },
-  { name: 'Kuning', hex: '#eab308' },
-];
 
 const PRICE_RANGES = [
   { label: 'Semua Harga', min: 0, max: 0 },
@@ -30,7 +22,7 @@ const PRICE_RANGES = [
   { label: 'Di atas Rp1jt', min: 1000000, max: 0 },
 ];
 
-export default function FilterSidebar({ categories }: FilterSidebarProps) {
+export default function FilterSidebar({ categories, colors = [], sizes = [] }: FilterSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -131,43 +123,49 @@ export default function FilterSidebar({ categories }: FilterSidebarProps) {
         </div>
       </div>
 
-      <hr className="divider" />
+      {/* Color — dynamic from server data */}
+      {colors.length > 0 && (
+        <>
+          <hr className="divider" />
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Warna</h3>
+            <div className={styles.colorGrid}>
+              {colors.map((color) => (
+                <button
+                  key={color.name}
+                  className={`${styles.colorBtn} ${activeColor === color.name ? styles.colorBtnActive : ''}`}
+                  onClick={() => updateParam('color', activeColor === color.name ? null : color.name)}
+                  title={color.name}
+                >
+                  <span className={styles.colorDot} style={{ background: color.hex }} />
+                  <span className={styles.colorLabel}>{color.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
-      {/* Color */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Warna</h3>
-        <div className={styles.colorGrid}>
-          {COLORS.map((color) => (
-            <button
-              key={color.name}
-              className={`${styles.colorBtn} ${activeColor === color.name ? styles.colorBtnActive : ''}`}
-              onClick={() => updateParam('color', activeColor === color.name ? null : color.name)}
-              title={color.name}
-            >
-              <span className={styles.colorDot} style={{ background: color.hex }} />
-              <span className={styles.colorLabel}>{color.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <hr className="divider" />
-
-      {/* Size */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Ukuran (EU)</h3>
-        <div className={styles.sizeGrid}>
-          {SHOE_SIZES.map((size) => (
-            <button
-              key={size}
-              className={`${styles.sizeBtn} ${activeSize === String(size) ? styles.sizeBtnActive : ''}`}
-              onClick={() => updateParam('size', activeSize === String(size) ? null : String(size))}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Size — dynamic from server data */}
+      {sizes.length > 0 && (
+        <>
+          <hr className="divider" />
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>Ukuran (EU)</h3>
+            <div className={styles.sizeGrid}>
+              {sizes.map((size) => (
+                <button
+                  key={size}
+                  className={`${styles.sizeBtn} ${activeSize === String(size) ? styles.sizeBtnActive : ''}`}
+                  onClick={() => updateParam('size', activeSize === String(size) ? null : String(size))}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </aside>
   );
 }

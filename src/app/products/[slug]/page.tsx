@@ -245,9 +245,10 @@ export default function ProductDetailPage() {
   };
 
   const currentPrice = product
-    ? product.discount
-      ? product.basePrice * (1 - product.discount / 100)
-      : product.basePrice
+    ? selectedSku?.price                          // SKU-level price override (if set)
+      ?? (product.discount
+        ? product.basePrice * (1 - product.discount / 100)
+        : product.basePrice)
     : 0;
 
   const avgRating = reviews.length
@@ -354,14 +355,19 @@ export default function ProductDetailPage() {
 
           <p className={styles.description}>{product.description}</p>
 
-          {/* Price */}
+          {/* Price — updates when SKU with price override is selected */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {product.discount && (
+            {product.discount && !selectedSku?.price && (
               <span style={{ fontSize: '1rem', textDecoration: 'line-through', color: 'var(--color-text-faint)' }}>
                 {formatPrice(product.basePrice)}
               </span>
             )}
             <p className={`${styles.price} price-xl`}>{formatPrice(currentPrice)}</p>
+            {selectedSku?.price && selectedSku.price !== product.basePrice && (
+              <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                Harga dasar: {formatPrice(product.basePrice)}
+              </p>
+            )}
           </div>
 
           <hr className="divider" />
@@ -397,20 +403,32 @@ export default function ProductDetailPage() {
               <p className={styles.variantLabel}>Ukuran (EU)</p>
               <div className={styles.sizeRow}>
                 {availableSizes.length ? (
-                  (availableSizes as number[]).map((size: number) => (
-                    <button
-                      key={size}
-                      type="button"
-                      className={`${styles.sizePill} ${selectedSize === size ? styles.sizePillActive : ''}`}
-                      onClick={() => { setSelectedSize(size); setStatus(''); }}
-                    >
-                      {size}
-                    </button>
-                  ))
+                  // Show all sizes for selected color, disable out-of-stock ones
+                  (product.skus || [])
+                    .filter((sku: ProductSKU) => sku.color === selectedColor)
+                    .sort((a: ProductSKU, b: ProductSKU) => a.sizeEU - b.sizeEU)
+                    .map((sku: ProductSKU) => (
+                      <button
+                        key={sku.sizeEU}
+                        type="button"
+                        className={`${styles.sizePill} ${selectedSize === sku.sizeEU ? styles.sizePillActive : ''}`}
+                        onClick={() => { if (sku.stock > 0) { setSelectedSize(sku.sizeEU); setStatus(''); } }}
+                        disabled={sku.stock === 0}
+                        title={sku.stock === 0 ? 'Stok habis' : `${sku.stock} tersisa`}
+                        style={{ opacity: sku.stock === 0 ? 0.35 : 1, cursor: sku.stock === 0 ? 'not-allowed' : 'pointer', position: 'relative', textDecoration: sku.stock === 0 ? 'line-through' : 'none' }}
+                      >
+                        {sku.sizeEU}
+                      </button>
+                    ))
                 ) : (
                   <p className="text-muted">Pilih warna terlebih dahulu.</p>
                 )}
               </div>
+              {selectedSku && (
+                <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: 6 }}>
+                  {selectedSku.stock > 0 ? `${selectedSku.stock} unit tersisa` : 'Stok habis'}
+                </p>
+              )}
             </div>
           </div>
 

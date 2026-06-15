@@ -13,6 +13,8 @@ import styles from './page.module.css';
 function SearchContent() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [filterColors, setFilterColors] = useState<{ name: string; hex: string }[]>([]);
+  const [filterSizes, setFilterSizes] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFromMock, setIsFromMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,9 +50,23 @@ function SearchContent() {
           }).filter(Boolean))
         ) as string[];
 
+        // Extract unique colors and sizes from all SKUs for dynamic filter
+        const colorMap = new Map<string, string>();
+        const sizeSet = new Set<number>();
+        normalized.forEach((p: any) => {
+          (p.skus || []).forEach((sku: any) => {
+            if (sku.color) colorMap.set(sku.color, sku.colorHex || '#888888');
+            if (sku.sizeEU) sizeSet.add(sku.sizeEU);
+          });
+        });
+        const uniqueColors = Array.from(colorMap.entries()).map(([name, hex]) => ({ name, hex }));
+        const uniqueSizes = Array.from(sizeSet).sort((a, b) => a - b);
+
         if (!mounted) return;
         setProducts(normalized);
         setCategories(uniqueCategories as string[]);
+        setFilterColors(uniqueColors);
+        setFilterSizes(uniqueSizes);
         setIsLoading(false);
       } catch (err: any) {
         if (!mounted) return;
@@ -100,16 +116,26 @@ if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCa
       const availableSkus = (product.skus || []).filter((sku: any) => sku.stock > 0);
       if (!availableSkus.length) return false;
 
-      if (category && product.category !== category) return false;
+      // Category filter: case-insensitive
+      if (category) {
+        const productCategory = String(product.category ?? '');
+        if (productCategory.toLowerCase() !== category.toLowerCase()) return false;
+      }
 
+      // Search filter
       if (search) {
         const name = String(product.name ?? '').toLowerCase();
         const desc = String(product.description ?? '').toLowerCase();
         if (![name, desc].some((field) => field.toLowerCase().includes(search))) return false;
       }
 
-if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCase() === color.toLowerCase())) return false;
-           if (size && !availableSkus.some((sku: any) => sku.sizeEU === size)) return false;
+      // Color: exact match against server value
+      if (color && !availableSkus.some((sku: any) => sku.color === color)) return false;
+
+      // Size: exact EU match
+      if (size && !availableSkus.some((sku: any) => Number(sku.sizeEU) === size)) return false;
+
+      // Price
       if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
       if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
 
@@ -148,7 +174,7 @@ if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCa
 
         <div className={styles.shopGrid}>
           <div className={styles.sidebarWrapper}>
-            <FilterSidebar categories={categories} />
+            <FilterSidebar categories={categories} colors={filterColors} sizes={filterSizes} />
           </div>
           <div className={styles.productGrid}>
             {filteredProducts.length === 0 ? (
