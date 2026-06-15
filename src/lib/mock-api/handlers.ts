@@ -324,10 +324,12 @@ export const mockHandlers = {
     const product = state.products.find((p) => p.id === id);
     if (!product) return fail('Product not found', 404);
     const url = `https://placehold.co/600x600/1a1a24/f97316?text=${encodeURIComponent(product.name)}`;
+    const imageId = nextId('img');
     product.imageUrl = url;
-    product.images = [url];
+    // Store as ProductImage-shaped objects so normalizeProduct can carry the id field through
+    product.images = [{ id: imageId, productId: id, url, isPrimary: true } as unknown as string];
     setMockState(state);
-    return ok({ imageUrl: url });
+    return ok({ imageUrl: url, productImage: { id: imageId, productId: id, url, isPrimary: true } });
   },
 
   listBrands: (params?: Record<string, unknown>) => {

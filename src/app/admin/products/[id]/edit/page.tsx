@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { productsApi, categoriesApi, brandsApi } from '@/lib/api';
 import { extractErrorMessage, formatPrice } from '@/lib/utils';
 
-import type { Product, ProductSKU, Category, Brand } from '@/types';
+import type { Product, ProductImage, ProductSKU, Category, Brand } from '@/types';
 
 const GENDER_OPTIONS = [
   { value: 'UNISEX', label: 'Unisex' },
@@ -82,7 +82,7 @@ export default function AdminProductEditPage() {
         category: raw.category as Product['category'],
         brand: raw.brand as Product['brand'],
         images: Array.isArray(raw.images)
-          ? (raw.images as string[])
+          ? (raw.images as ProductImage[])
           : [],
         skus: Array.isArray(raw.skus)
           ? (raw.skus as ProductSKU[]).map((s) => ({

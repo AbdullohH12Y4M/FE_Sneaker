@@ -149,7 +149,9 @@ export const productsApi = {
   },
 
   deleteImage: (productId: string, imageId: string) =>
-    api.delete(`/api/products/${productId}/image?imageId=${imageId}`),
+    isMockApiEnabled()
+      ? Promise.resolve({ data: { success: true } })
+      : api.delete(`/api/products/${productId}/image?imageId=${imageId}`),
 
   deleteProduct: (id: string) =>
     isMockApiEnabled()

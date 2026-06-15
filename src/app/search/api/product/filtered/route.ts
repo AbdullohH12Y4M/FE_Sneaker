@@ -42,7 +42,13 @@ export async function GET(req: NextRequest) {
 
     const items = products.map((p) => ({
       ...p,
-      images: p.images.map((img) => img.url),
+      images: p.images.map((img) => ({
+        id: img.id,
+        productId: p.id,
+        url: img.url,
+        isPrimary: img.isPrimary,
+        createdAt: '',
+      })),
       skus: p.skus.map((sku) => ({
         id: sku.id,
         productId: sku.productId,

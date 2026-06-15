@@ -177,7 +177,7 @@ export default function Navbar() {
                         <>
                           {searchResults.map((p) => (
                             <Link key={p.id} href={`/products/${p.slug}`} className={styles.searchItem} onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}>
-                              <img src={p.images?.[0] ?? '/placeholder-shoes.png'} alt={p.name} className={styles.searchItemImage} />
+                              <img src={p.images?.[0]?.url ?? '/placeholder-shoes.png'} alt={p.name} className={styles.searchItemImage} />
                               <div>
                                 <div className={styles.searchItemName}>{p.name}</div>
                                 <div className={styles.searchItemPrice}>{`Rp${Number(p.basePrice ?? 0).toLocaleString('id-ID')}`}</div>

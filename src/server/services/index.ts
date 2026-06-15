@@ -170,7 +170,13 @@ export const ProductService = {
       totalPages: Math.ceil(total / limit),
       items: items.map((p) => ({
         ...p,
-        images: p.images.map((img) => img.url),
+        images: p.images.map((img) => ({
+          id: img.id,
+          productId: p.id,
+          url: img.url,
+          isPrimary: img.isPrimary,
+          createdAt: '',
+        })),
       })),
     };
   },
@@ -182,7 +188,13 @@ export const ProductService = {
     }
     return {
       ...product,
-      images: product.images.map((img) => img.url),
+      images: product.images.map((img) => ({
+        id: img.id,
+        productId: product.id,
+        url: img.url,
+        isPrimary: img.isPrimary,
+        createdAt: '',
+      })),
     };
   },
 
