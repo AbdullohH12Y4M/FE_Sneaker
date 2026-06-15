@@ -22,8 +22,8 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const isOutOfStock = totalStock === 0;
 
   const displayImage =
-    !imgError && product.images?.[0]
-      ? product.images[0]
+    !imgError && product.images?.[0]?.url
+      ? product.images[0].url
       : `https://placehold.co/400x400/1a1a24/f97316?text=${encodeURIComponent(product.name.slice(0, 8))}`;
 
   return (

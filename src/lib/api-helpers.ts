@@ -61,15 +61,32 @@ export function normalizeProduct(product: Record<string, unknown>): Product {
     : [];
   const skus = rawSkus.map(normalizeSku);
 
-  // Images: API returns string[] already (normalized in routes).
-  // But handle both string[] and ProductImage[] objects for safety.
-  let images: string[] = ['/placeholder-shoes.png'];
+  // ─── Images: preserve full ProductImage object (id + url + isPrimary) ──────
+  // Root-cause fix for Issue #5: previously we stripped images to string[],
+  // discarding the `id` field. This forced handleDeleteImage to perform an
+  // extra API round-trip just to get the imageId. By keeping the full object
+  // we enable direct delete without a double-fetch.
+  let images: import('@/types').ProductImage[] = [];
   if (Array.isArray(product.images) && product.images.length > 0) {
     const first = product.images[0];
     if (typeof first === 'string') {
-      images = product.images as string[];
+      // Legacy shape: string[] — wrap into ProductImage objects with no id
+      images = (product.images as string[]).map((url, i) => ({
+        id: '',          // no id available from legacy shape
+        productId: String(product.id ?? ''),
+        url,
+        isPrimary: i === 0,
+        createdAt: '',
+      }));
     } else if (typeof first === 'object' && first !== null) {
-      images = (product.images as { url: string }[]).map((i) => i.url);
+      // Current shape: ProductImage[] — map directly
+      images = (product.images as Record<string, unknown>[]).map((img) => ({
+        id: String(img.id ?? ''),
+        productId: String(img.productId ?? product.id ?? ''),
+        url: String(img.url ?? ''),
+        isPrimary: Boolean(img.isPrimary ?? false),
+        createdAt: String(img.createdAt ?? ''),
+      }));
     }
   }
 

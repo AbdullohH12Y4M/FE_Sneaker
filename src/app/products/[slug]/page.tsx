@@ -128,7 +128,7 @@ export default function ProductDetailPage() {
 
         if (!mounted) return;
         setProduct(normalized);
-        setActiveImage(normalized.images[0] ?? '');
+        setActiveImage(normalized.images[0]?.url ?? '');
       } catch {
         if (!mounted) return;
         setError('Produk tidak ditemukan atau tidak aktif.');
@@ -284,14 +284,14 @@ export default function ProductDetailPage() {
           </div>
           {product.images && product.images.length > 1 && (
             <div className={styles.galleryRow}>
-              {(product.images as string[]).map((img: string, idx: number) => (
+              {product.images.map((imgObj, idx: number) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={idx}
-                  src={img}
+                  src={imgObj.url}
                   alt={`${product.name} ${idx + 1}`}
-                  className={`${styles.thumbnail} ${activeImage === img ? styles.thumbnailActive : ''}`}
-                  onClick={() => setActiveImage(img)}
+                  className={`${styles.thumbnail} ${activeImage === imgObj.url ? styles.thumbnailActive : ''}`}
+                  onClick={() => setActiveImage(imgObj.url)}
                 />
               ))}
             </div>

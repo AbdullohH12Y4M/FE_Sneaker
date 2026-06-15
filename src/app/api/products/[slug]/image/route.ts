@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAdminOrStaff, isErrorResponse } from '@/lib/server-auth';
-import { v2 as cloudinary } from 'cloudinary';
+import { uploadToCloudinary, deleteCloudinaryAsset } from '@/server/utils/cloudinary';
+import { validateUploadedFile } from '@/server/utils/validate-upload';
 
 type Params = { params: Promise<{ slug: string }> };
 
-/** Lazy Cloudinary config — reads env vars at request time, not module load time. */
-function getCloudinary() {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-  return cloudinary;
-}
-
 /**
  * POST /api/products/[id]/image
- * Upload product image to Cloudinary and create a ProductImage record.
+ * Upload a product image to Cloudinary and create a ProductImage record.
+ *
  * The [slug] param is treated as a product ID for mutations.
+ *
+ * Validation:
+ * - MIME type must be an image/* type in the allowed whitelist
+ * - File size must be ≤ 5 MB
  */
 export async function POST(req: NextRequest, { params }: Params) {
   const authResult = await requireAdminOrStaff(req);
@@ -33,45 +29,33 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    if (!file) {
-      return NextResponse.json({ message: 'File tidak ditemukan' }, { status: 400 });
+    const rawFile = formData.get('file') as File | null;
+
+    // Validate MIME type whitelist + 5 MB size limit — throws with friendly message on failure
+    let file: File;
+    try {
+      file = validateUploadedFile(rawFile);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'File tidak valid';
+      return NextResponse.json({ message: msg }, { status: 400 });
     }
 
     const isPrimary = formData.get('isPrimary') === 'true';
 
-    // Upload to Cloudinary
+    // Upload to Cloudinary via shared helper
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const safeMimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
-    const base64File = `data:${safeMimeType};base64,${buffer.toString('base64')}`;
 
-    const cld = getCloudinary();
-    let imageUrl: string;
-
+    let uploadResult: { secureUrl: string; publicId: string };
     try {
-      const uploadResult = await cld.uploader.upload(base64File, {
+      uploadResult = await uploadToCloudinary(buffer, file.type, {
         folder: 'sneakerlocal/products',
-        resource_type: 'image',
-        public_id: `product-${id}-${Date.now()}`,
+        publicId: `product-${id}-${Date.now()}`,
       });
-      imageUrl = uploadResult.secure_url;
-    } catch (uploadErr: unknown) {
-      let msg = 'Upload gagal';
-      if (uploadErr && typeof uploadErr === 'object') {
-        const e = uploadErr as Record<string, unknown>;
-        if (e.error && typeof e.error === 'object') {
-          msg = (e.error as Record<string, unknown>).message as string ?? msg;
-        } else if (typeof e.message === 'string') {
-          msg = e.message;
-        } else {
-          msg = JSON.stringify(uploadErr);
-        }
-      } else if (uploadErr instanceof Error) {
-        msg = uploadErr.message;
-      }
-      console.error('[products/image POST] Cloudinary error:', JSON.stringify(uploadErr));
-      return NextResponse.json({ message: `Gagal mengunggah gambar: ${msg}` }, { status: 500 });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Upload gagal';
+      console.error('[products/image POST] Upload error:', msg);
+      return NextResponse.json({ message: msg }, { status: 500 });
     }
 
     // If this is the primary image, unset any existing primary
@@ -87,10 +71,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const shouldBePrimary = isPrimary || existingCount === 0;
 
     const productImage = await prisma.productImage.create({
-      data: { productId: id, url: imageUrl, isPrimary: shouldBePrimary },
+      data: { productId: id, url: uploadResult.secureUrl, isPrimary: shouldBePrimary },
     });
 
-    return NextResponse.json({ imageUrl, productImage });
+    return NextResponse.json({ imageUrl: uploadResult.secureUrl, productImage });
   } catch (e) {
     console.error('[products/[id]/image POST]', e);
     return NextResponse.json({ message: 'Server error' }, { status: 500 });
@@ -99,9 +83,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 /**
  * DELETE /api/products/[id]/image?imageId=xxx
- * Remove a specific product image record from DB.
- * Note: Cloudinary file is NOT deleted here to preserve CDN cache.
- * Use Cloudinary dashboard to clean up unused assets.
+ * Remove a specific product image from DB AND from Cloudinary storage.
+ *
+ * Root-cause fix: Previously only deleted the DB record, leaving the
+ * Cloudinary asset orphaned. Now we extract the public_id from the stored URL
+ * and call Cloudinary destroy() before removing the DB row.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
   const authResult = await requireAdminOrStaff(req);
@@ -123,7 +109,21 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       return NextResponse.json({ message: 'Gambar tidak ditemukan' }, { status: 404 });
     }
 
+    // ─── Delete from Cloudinary FIRST ────────────────────────────────────────
+    // We delete Cloudinary before the DB row so that if the Cloudinary call
+    // fails we can still surface the error and the DB record stays intact
+    // (preventing a phantom record that points to a deleted asset).
+    try {
+      await deleteCloudinaryAsset(image.url);
+    } catch (cloudinaryErr: unknown) {
+      // Log but do NOT abort — if Cloudinary delete fails (e.g. already gone),
+      // we still want to clean up the DB row.
+      const msg = cloudinaryErr instanceof Error ? cloudinaryErr.message : String(cloudinaryErr);
+      console.warn('[products/image DELETE] Cloudinary delete warning:', msg);
+    }
+
     await prisma.productImage.delete({ where: { id: imageId } });
+
     return NextResponse.json({ success: true, message: 'Gambar berhasil dihapus' });
   } catch (e) {
     console.error('[products/[id]/image DELETE]', e);

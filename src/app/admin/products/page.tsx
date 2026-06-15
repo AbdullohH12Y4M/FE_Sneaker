@@ -370,10 +370,10 @@ export default function AdminProductsPage() {
                   <tr key={product.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {product.images?.[0] && (
+                        {product.images?.[0]?.url && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={product.images[0]}
+                            src={product.images[0].url}
                             alt={product.name}
                             style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--color-border)' }}
                           />

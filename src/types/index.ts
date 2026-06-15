@@ -73,8 +73,12 @@ export interface Product {
   /** Dikirim sebagai objek dari API */
   category: { id: string; name: string; slug: string } | string;
   brand: { id: string; name: string; slug: string } | string;
-  /** Array URL gambar (dinormalisasi dari ProductImage[]) */
-  images: string[];
+  /**
+   * Gambar produk — menyimpan id + url agar admin dapat menghapus per-gambar
+   * tanpa perlu fetch ulang hanya untuk mendapatkan imageId.
+   * Gunakan images[0]?.url untuk mendapatkan URL gambar utama.
+   */
+  images: ProductImage[];
   skus: ProductSKU[];
   createdAt?: string;
   updatedAt?: string;

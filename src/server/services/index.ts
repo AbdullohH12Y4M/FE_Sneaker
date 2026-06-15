@@ -18,19 +18,8 @@ import {
 } from '../errors';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { setAuthCookies, clearAuthCookies, TokenPayload } from '../auth/jwt';
-import { v2 as cloudinary } from 'cloudinary';
+import { uploadToCloudinary, deleteCloudinaryAsset } from '../utils/cloudinary';
 import { OrderStatus } from '@prisma/client';
-
-// ─── Cloudinary helper — config dipanggil lazy agar env vars tersedia saat runtime ─
-// Cloudinary v2 config is idempotent; calling it per-request is safe and cheap.
-function getCloudinary() {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-  return cloudinary;
-}
 
 // ─── USER SERVICE ────────────────────────────────────────────────────────────
 export const UserService = {
@@ -579,51 +568,38 @@ export const OrderService = {
       throw new ForbiddenError('Akses ditolak');
     }
 
-    // Validate Cloudinary credentials before attempting upload
-    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-      throw new ValidationError('Konfigurasi upload tidak lengkap. Hubungi administrator.');
+    // ─── Delete old proof from Cloudinary BEFORE uploading the new one ────────
+    // Root-cause fix for Issue #6: previously the old Cloudinary asset was
+    // left orphaned every time a customer re-uploaded their payment proof.
+    if (order.paymentProofUrl) {
+      try {
+        await deleteCloudinaryAsset(order.paymentProofUrl);
+        console.info(`[uploadPaymentProof] Deleted old proof for orderId=${orderId}`);
+      } catch (delErr: unknown) {
+        // Non-fatal: log and continue. The upload should still proceed even if
+        // deleting the old asset fails (e.g. already gone from Cloudinary).
+        const msg = delErr instanceof Error ? delErr.message : String(delErr);
+        console.warn(`[uploadPaymentProof] Could not delete old proof: ${msg}`);
+      }
     }
 
-    // Upload to Cloudinary — lazy config to ensure env vars are read at request time
-    const cld = getCloudinary();
+    // ─── Upload new proof via shared helper ───────────────────────────────────
+    console.info(`[uploadPaymentProof] Uploading: orderId=${orderId}, mimeType=${mimeType}, size=${fileBuffer.length}B`);
 
-    // Ensure mimeType is a valid image type — Cloudinary rejects unknown types
-    const safeMimeType = mimeType && mimeType.startsWith('image/') ? mimeType : 'image/jpeg';
-    const base64File = `data:${safeMimeType};base64,${fileBuffer.toString('base64')}`;
-
-    console.info(`[uploadPaymentProof] Uploading: orderId=${orderId}, mimeType=${safeMimeType}, size=${fileBuffer.length}B`);
-
-    let uploadResult: { secure_url: string };
+    let secureUrl: string;
     try {
-      uploadResult = await cld.uploader.upload(base64File, {
+      const result = await uploadToCloudinary(fileBuffer, mimeType, {
         folder: 'sneakerlocal/payments',
-        resource_type: 'image',
       });
-      console.info(`[uploadPaymentProof] Success: ${uploadResult.secure_url}`);
-    } catch (uploadErr: unknown) {
-      // Cloudinary SDK v2 throws a plain object, not an Error instance.
-      // Shape: { error: { message: string }, http_code?: number }
-      // or just: { message: string, http_code: number }
-      let msg = 'Upload gagal';
-      if (uploadErr && typeof uploadErr === 'object') {
-        const e = uploadErr as Record<string, unknown>;
-        // Try nested .error.message first (SDK v2 typical shape)
-        if (e.error && typeof e.error === 'object') {
-          msg = (e.error as Record<string, unknown>).message as string ?? msg;
-        } else if (typeof e.message === 'string') {
-          msg = e.message;
-        } else {
-          // Last resort — JSON stringify for full visibility in logs
-          msg = JSON.stringify(uploadErr);
-        }
-      } else if (uploadErr instanceof Error) {
-        msg = uploadErr.message;
-      }
-      console.error('[uploadPaymentProof] Cloudinary error detail:', JSON.stringify(uploadErr));
+      secureUrl = result.secureUrl;
+      console.info(`[uploadPaymentProof] Success: ${secureUrl}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[uploadPaymentProof] Upload error:', msg);
       throw new Error(`Gagal mengunggah bukti pembayaran: ${msg}`);
     }
 
-    return OrderRepository.uploadPaymentProof(orderId, uploadResult.secure_url, note);
+    return OrderRepository.uploadPaymentProof(orderId, secureUrl, note);
   },
 
   async updateOrderStatus(adminId: string, id: string, status: OrderStatus, note?: string) {
@@ -671,9 +647,7 @@ export const AdminService = {
 // ─── UPLOAD SERVICE ──────────────────────────────────────────────────────────
 export const UploadService = {
   async uploadFile(fileBuffer: Buffer, mimeType: string, folder = 'sneakerlocal/general') {
-    const cld = getCloudinary();
-    const base64File = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-    const result = await cld.uploader.upload(base64File, { folder, resource_type: 'image' });
-    return { url: result.secure_url };
+    const result = await uploadToCloudinary(fileBuffer, mimeType, { folder });
+    return { url: result.secureUrl };
   },
 };

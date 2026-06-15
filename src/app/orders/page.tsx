@@ -192,12 +192,20 @@ export default function OrdersPage() {
                           type="file"
                           accept="image/*"
                           hidden
+                          disabled={uploadingOrder === order.id}
                           onChange={(event) => {
                             const file = event.target.files?.[0];
                             if (file) handleUpload(order.id, file);
                           }}
                         />
                       </label>
+                      {uploadingOrder === order.id && (
+                        <div className="upload-progress">
+                          <div className="upload-progress-bar"></div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
                       <div style={{ marginTop: 10 }}>
                         <label className="form-label" htmlFor={`note-${order.id}`}>
                           Catatan Tambahan (Opsional)
@@ -216,19 +224,27 @@ export default function OrdersPage() {
                     </>
                   ) : order.status === 'WAITING_CONFIRMATION' ? (
                     /* Allow re-upload when WAITING_CONFIRMATION */
-                    <label className="btn btn-secondary btn-sm" htmlFor={`proof-replace-${order.id}`} style={{ marginTop: 8 }}>
-                      {uploadingOrder === order.id ? 'Mengunggah...' : 'Ganti Bukti Transfer'}
-                      <input
-                        id={`proof-replace-${order.id}`}
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) handleUpload(order.id, file);
-                        }}
-                      />
-                    </label>
+                    <>
+                      <label className="btn btn-secondary btn-sm" htmlFor={`proof-replace-${order.id}`} style={{ marginTop: 8 }}>
+                        {uploadingOrder === order.id ? 'Mengunggah...' : 'Ganti Bukti Transfer'}
+                        <input
+                          id={`proof-replace-${order.id}`}
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          disabled={uploadingOrder === order.id}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) handleUpload(order.id, file);
+                          }}
+                        />
+                      </label>
+                      {uploadingOrder === order.id && (
+                        <div className="upload-progress">
+                          <div className="upload-progress-bar"></div>
+                        </div>
+                      )}
+                    </>
                   ) : null}
 
                   {order.status === 'WAITING_CONFIRMATION' && (

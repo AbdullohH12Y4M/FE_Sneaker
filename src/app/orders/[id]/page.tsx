@@ -221,12 +221,18 @@ export default function OrderDetailPage() {
                 type="file"
                 accept="image/*"
                 hidden
+                disabled={uploading}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) handleUpload(file);
                 }}
               />
             </label>
+            {uploading && (
+              <div className="upload-progress" style={{ marginTop: 12 }}>
+                <div className="upload-progress-bar"></div>
+              </div>
+            )}
             <div style={{ marginTop: 10 }}>
               <label className="form-label" htmlFor={`note-${order.id}`}>Catatan Tambahan (Opsional)</label>
               <textarea

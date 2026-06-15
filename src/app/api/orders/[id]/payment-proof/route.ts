@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createHandler } from '@/server/utils/route-handler';
 import { OrderService } from '@/server/services';
+import { validateUploadedFile } from '@/server/utils/validate-upload';
 
 export const POST = createHandler(
   async (req: NextRequest, ctx) => {
@@ -9,19 +10,18 @@ export const POST = createHandler(
     const file = formData.get('file') as File | null;
     const note = formData.get('note') as string | null;
 
-    if (!file) {
-      throw new Error('File tidak ditemukan');
-    }
+    // Validates MIME type (whitelist) and size (≤ 5 MB) — throws on failure
+    const validFile = validateUploadedFile(file);
 
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer = await validFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const order = await OrderService.uploadPaymentProof(
       ctx.user!.id,
       orderId,
       buffer,
-      file.name,
-      file.type,
+      validFile.name,
+      validFile.type,
       note || undefined
     );
 

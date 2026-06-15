@@ -198,19 +198,11 @@ export default function AdminProductEditPage() {
     }
   };
 
-  const handleDeleteImage = async (imageUrl: string) => {
+  const handleDeleteImage = async (imageId: string) => {
     if (!productId || !confirm('Hapus gambar ini?')) return;
-    // Extract imageId — if we don't have it, just refetch after
-    // For now we delete by URL via a simple re-fetch approach
     try {
       setError('');
-      // The API needs imageId; we need the full images list from raw API
-      // Refetch product to get image IDs
-      const res = await productsApi.getById(productId);
-      const raw = res.data as { images?: { id: string; url: string }[] };
-      const img = (raw.images ?? []).find((i) => i.url === imageUrl);
-      if (!img) return;
-      await productsApi.deleteImage(productId, img.id);
+      await productsApi.deleteImage(productId, imageId);
       await fetchProduct();
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
@@ -469,17 +461,17 @@ export default function AdminProductEditPage() {
           {/* Current Images */}
           {product?.images && product.images.length > 0 && (
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', margin: '16px 0' }}>
-              {product.images.map((url, idx) => (
-                <div key={idx} style={{ position: 'relative' }}>
+              {product.images.map((img, idx) => (
+                <div key={img.id || idx} style={{ position: 'relative' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={url}
+                    src={img.url}
                     alt={`Foto ${idx + 1}`}
                     style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                   />
                   <button
                     type="button"
-                    onClick={() => handleDeleteImage(url)}
+                    onClick={() => handleDeleteImage(img.id)}
                     style={{
                       position: 'absolute', top: '-6px', right: '-6px',
                       background: 'var(--color-danger)', color: '#fff',
@@ -519,6 +511,11 @@ export default function AdminProductEditPage() {
               {uploadingImage ? 'Mengunggah...' : 'Unggah Foto'}
             </button>
           </div>
+          {uploadingImage && (
+            <div className="upload-progress" style={{ marginTop: 12 }}>
+              <div className="upload-progress-bar"></div>
+            </div>
+          )}
         </div>
 
         {/* SKUs Table */}
