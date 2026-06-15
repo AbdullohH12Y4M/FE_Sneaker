@@ -586,7 +586,12 @@ export const OrderService = {
 
     // Upload to Cloudinary — lazy config to ensure env vars are read at request time
     const cld = getCloudinary();
-    const base64File = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+
+    // Ensure mimeType is a valid image type — Cloudinary rejects unknown types
+    const safeMimeType = mimeType && mimeType.startsWith('image/') ? mimeType : 'image/jpeg';
+    const base64File = `data:${safeMimeType};base64,${fileBuffer.toString('base64')}`;
+
+    console.info(`[uploadPaymentProof] Uploading: orderId=${orderId}, mimeType=${safeMimeType}, size=${fileBuffer.length}B`);
 
     let uploadResult: { secure_url: string };
     try {
@@ -594,9 +599,27 @@ export const OrderService = {
         folder: 'sneakerlocal/payments',
         resource_type: 'image',
       });
+      console.info(`[uploadPaymentProof] Success: ${uploadResult.secure_url}`);
     } catch (uploadErr: unknown) {
-      const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-      console.error('[uploadPaymentProof] Cloudinary error:', msg);
+      // Cloudinary SDK v2 throws a plain object, not an Error instance.
+      // Shape: { error: { message: string }, http_code?: number }
+      // or just: { message: string, http_code: number }
+      let msg = 'Upload gagal';
+      if (uploadErr && typeof uploadErr === 'object') {
+        const e = uploadErr as Record<string, unknown>;
+        // Try nested .error.message first (SDK v2 typical shape)
+        if (e.error && typeof e.error === 'object') {
+          msg = (e.error as Record<string, unknown>).message as string ?? msg;
+        } else if (typeof e.message === 'string') {
+          msg = e.message;
+        } else {
+          // Last resort — JSON stringify for full visibility in logs
+          msg = JSON.stringify(uploadErr);
+        }
+      } else if (uploadErr instanceof Error) {
+        msg = uploadErr.message;
+      }
+      console.error('[uploadPaymentProof] Cloudinary error detail:', JSON.stringify(uploadErr));
       throw new Error(`Gagal mengunggah bukti pembayaran: ${msg}`);
     }
 
