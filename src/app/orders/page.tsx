@@ -232,6 +232,57 @@ export default function OrdersPage() {
           ))}
         </div>
       )}
+
+      {/* Cancel confirmation modal — replaces window.confirm() */}
+      {cancelConfirmId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-modal-title"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)',
+          }}
+          onClick={() => setCancelConfirmId(null)}
+        >
+          <div
+            className="card"
+            style={{ padding: '32px', maxWidth: '400px', width: '90%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="cancel-modal-title" style={{ marginBottom: '12px' }}>Batalkan Pesanan?</h3>
+            <p className="text-muted" style={{ marginBottom: '24px' }}>
+              Pesanan #{cancelConfirmId.slice(-8)} akan dibatalkan. Tindakan ini tidak bisa dibatalkan.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setCancelConfirmId(null)}
+              >
+                Tidak, Kembali
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={async () => {
+                  const id = cancelConfirmId;
+                  setCancelConfirmId(null);
+                  try {
+                    await ordersApi.deleteOrder(id);
+                    setOrders((prev) => prev.filter((o) => o.id !== id));
+                  } catch (err: unknown) {
+                    setError(extractErrorMessage(err));
+                  }
+                }}
+              >
+                Ya, Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

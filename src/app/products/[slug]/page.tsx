@@ -6,9 +6,9 @@ import { ShoppingBag, ArrowLeft, Star, Send, User } from 'lucide-react';
 
 import { useCartStore } from '@/store/cart';
 import { productsApi } from '@/lib/api';
+import { normalizeProduct } from '@/lib/api-helpers';
 import { formatPrice } from '@/lib/utils';
 import type { Product, ProductSKU } from '@/types';
-import { mockProducts } from '@/data/mockProducts';
 import styles from './ProductDetail.module.css';
 
 // ─── Mock Reviews ─────────────────────────────────────────────────────────────
@@ -95,7 +95,6 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isFromMock, setIsFromMock] = useState(false);
 
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedSize, setSelectedSize] = useState<number | null>(null);
@@ -120,46 +119,19 @@ export default function ProductDetailPage() {
       setError('');
       try {
         const res = await productsApi.getBySlug(slug);
-        const data = res.data;
+        if (!res.data) throw new Error('Produk tidak ditemukan');
+
+        // /api/products/[slug] uses createHandler → Wrapped_Response: { success, data: {...} }
+        // We need res.data.data — fallback to res.data for safety if already unwrapped
+        const raw = (res.data as { data?: unknown })?.data ?? res.data;
+        const normalized = normalizeProduct(raw as Record<string, unknown>);
+
         if (!mounted) return;
-        // Normalize category from API
-        const normalized = {
-          ...data,
-          category:
-            typeof data.category === 'object' && data.category !== null
-              ? (data.category.name ?? data.category.slug ?? 'Uncategorized')
-              : (data.category || 'Uncategorized'),
-          images: data.images?.length ? data.images : ['/placeholder-shoes.png'],
-          // Normalize SKUs: flatten inventory.stock → stock
-          skus: (data.skus ?? []).map((sku: any) => ({
-            ...sku,
-            stock: typeof sku.stock === 'number'
-              ? sku.stock
-              : (sku.inventory?.stock ?? 0),
-          })),
-        };
         setProduct(normalized);
-        setActiveImage(normalized.images[0]);
-        setIsFromMock(false);
+        setActiveImage(normalized.images[0] ?? '');
       } catch {
         if (!mounted) return;
-        // Fallback to mock
-        const found = mockProducts.find((p) => p.slug === slug);
-        if (found) {
-          const mockNorm = {
-            ...found,
-            category:
-              (typeof found.category === 'string'
-                ? found.category
-                : (found.category as any)?.name ?? 'Uncategorized'),
-            images: found.images?.length ? found.images : ['/placeholder-shoes.png'],
-          };
-          setProduct(mockNorm as any);
-          setActiveImage(mockNorm.images[0]);
-          setIsFromMock(true);
-        } else {
-          setError('Produk tidak ditemukan atau tidak aktif.');
-        }
+        setError('Produk tidak ditemukan atau tidak aktif.');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -298,15 +270,6 @@ export default function ProductDetailPage() {
         <span className={styles.breadcrumbSep}>/</span>
         <span className={styles.breadcrumbCurrent}>{product.name}</span>
       </div>
-
-      {/* Demo banner */}
-      {isFromMock && (
-        <div className="card" style={{ padding: '10px 16px', marginBottom: 24, borderLeft: '4px solid var(--color-warning)' }}>
-          <p className="text-muted" style={{ margin: 0, fontSize: '0.875rem' }}>
-            ⚠️ <strong>Mode Demo:</strong> Menampilkan data contoh. Detail lengkap tersedia setelah backend terhubung.
-          </p>
-        </div>
-      )}
 
       {/* Product Layout */}
       <div className={styles.productLayout}>
