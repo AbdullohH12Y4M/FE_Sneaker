@@ -42,12 +42,13 @@ export default function CheckoutPage() {
     try {
       const checkoutData = {
         items: items.map((item) => ({
-          skuId: item.skuId,
+          productSkuId: item.skuId,
           quantity: item.quantity,
         })),
         shippingType,
-        district: shippingType === 'DELIVERY' ? district : undefined,
+        shippingDistrict: shippingType === 'DELIVERY' ? district : undefined,
         shippingAddress: shippingType === 'DELIVERY' ? address : undefined,
+        notes: notes || undefined,
         paymentMethod: 'MANUAL_TRANSFER',
       };
 
@@ -191,6 +192,10 @@ export default function CheckoutPage() {
               <div className={styles.summaryItem}>
                 <span>Subtotal</span>
                 <strong>{formatPrice(subtotal)}</strong>
+              </div>
+              <div className={styles.summaryItem}>
+                <span>Ongkir</span>
+                <span className="text-muted">Dihitung otomatis</span>
               </div>
               <div className={styles.summaryTotal}>
                 <span>Total Bayar</span>

@@ -79,17 +79,11 @@ async function verifySessionToken(token: string): Promise<JwtSession | null> {
 
 // ─── Extract token from cookies ───────────────────────────────────────────────
 function extractTokenFromRequest(request: NextRequest): string | null {
-  // Primary source: our custom HttpOnly access_token cookie
+  // Only use our custom HttpOnly access_token cookie.
+  // NextAuth session tokens use JWE encryption which requires @auth/core decrypt,
+  // not available in Edge middleware with simple jwtVerify.
   const accessToken = request.cookies.get('access_token')?.value;
-  if (accessToken) return accessToken;
-
-  // Fallback: NextAuth session token cookie names (for projects using both systems)
-  const nextAuthToken =
-    request.cookies.get('authjs.session-token')?.value ??
-    request.cookies.get('next-auth.session-token')?.value;
-  if (nextAuthToken) return nextAuthToken;
-
-  return null;
+  return accessToken ?? null;
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
