@@ -632,12 +632,14 @@ export const OrderRepository = {
     });
   },
 
-  async uploadPaymentProof(id: string, proofUrl: string) {
+  async uploadPaymentProof(id: string, proofUrl: string, note?: string) {
     return db.order.update({
       where: { id },
       data: {
         paymentProofUrl: proofUrl,
         status: 'WAITING_CONFIRMATION',
+        // Preserve existing notes or append payment note if provided
+        ...(note ? { notes: note } : {}),
       },
     });
   },

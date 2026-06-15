@@ -21,12 +21,16 @@ import { setAuthCookies, clearAuthCookies, TokenPayload } from '../auth/jwt';
 import { v2 as cloudinary } from 'cloudinary';
 import { OrderStatus } from '@prisma/client';
 
-// Cloudinary Configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// ─── Cloudinary helper — config dipanggil lazy agar env vars tersedia saat runtime ─
+// Cloudinary v2 config is idempotent; calling it per-request is safe and cheap.
+function getCloudinary() {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  return cloudinary;
+}
 
 // ─── USER SERVICE ────────────────────────────────────────────────────────────
 export const UserService = {
@@ -575,13 +579,28 @@ export const OrderService = {
       throw new ForbiddenError('Akses ditolak');
     }
 
-    // Upload to Cloudinary
-    const base64File = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-    const result = await cloudinary.uploader.upload(base64File, {
-      folder: 'sneakerlocal/payments',
-    });
+    // Validate Cloudinary credentials before attempting upload
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      throw new ValidationError('Konfigurasi upload tidak lengkap. Hubungi administrator.');
+    }
 
-    return OrderRepository.uploadPaymentProof(orderId, result.secure_url);
+    // Upload to Cloudinary — lazy config to ensure env vars are read at request time
+    const cld = getCloudinary();
+    const base64File = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+
+    let uploadResult: { secure_url: string };
+    try {
+      uploadResult = await cld.uploader.upload(base64File, {
+        folder: 'sneakerlocal/payments',
+        resource_type: 'image',
+      });
+    } catch (uploadErr: unknown) {
+      const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+      console.error('[uploadPaymentProof] Cloudinary error:', msg);
+      throw new Error(`Gagal mengunggah bukti pembayaran: ${msg}`);
+    }
+
+    return OrderRepository.uploadPaymentProof(orderId, uploadResult.secure_url, note);
   },
 
   async updateOrderStatus(adminId: string, id: string, status: OrderStatus, note?: string) {
@@ -629,8 +648,9 @@ export const AdminService = {
 // ─── UPLOAD SERVICE ──────────────────────────────────────────────────────────
 export const UploadService = {
   async uploadFile(fileBuffer: Buffer, mimeType: string, folder = 'sneakerlocal/general') {
+    const cld = getCloudinary();
     const base64File = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-    const result = await cloudinary.uploader.upload(base64File, { folder });
+    const result = await cld.uploader.upload(base64File, { folder, resource_type: 'image' });
     return { url: result.secure_url };
   },
 };
