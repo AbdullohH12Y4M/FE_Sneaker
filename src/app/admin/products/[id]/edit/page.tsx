@@ -37,6 +37,8 @@ export default function AdminProductEditPage() {
     color: string; colorHex: string; sizeEU: string;
     sizeUS: string; sizeUK: string; sizeCM: string; price: string; stock: string;
   }>({ color: '', colorHex: '#888888', sizeEU: '', sizeUS: '', sizeUK: '', sizeCM: '', price: '', stock: '' });
+  // Snapshot to diff SKU form changes
+  const [originalSkuEditForm, setOriginalSkuEditForm] = useState<typeof skuEditForm | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -50,6 +52,8 @@ export default function AdminProductEditPage() {
     categoryId: '',
     brandId: '',
   });
+  // Snapshot of original values to diff against on save
+  const [originalFormData, setOriginalFormData] = useState<typeof formData | null>(null);
 
   const fetchProduct = useCallback(async () => {
     if (!productId) return;
@@ -103,7 +107,7 @@ export default function AdminProductEditPage() {
       };
 
       setProduct(found);
-      setFormData({
+      const initial = {
         name: found.name,
         slug: found.slug,
         skuCode: found.skuCode,
@@ -114,7 +118,9 @@ export default function AdminProductEditPage() {
         isActive: found.isActive,
         categoryId: found.categoryId,
         brandId: found.brandId,
-      });
+      };
+      setFormData(initial);
+      setOriginalFormData(initial);
 
       const catData = catRes.data as { items?: Category[] } | Category[];
       setCategories(Array.isArray(catData) ? catData : (catData as { items?: Category[] }).items ?? []);
@@ -137,23 +143,34 @@ export default function AdminProductEditPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productId) return;
+    if (!productId || !originalFormData) return;
     setSaving(true);
     setError('');
     setSuccess('');
+
+    // Build partial patch — only send changed fields
+    const patch: Record<string, unknown> = {};
+    if (formData.name !== originalFormData.name) patch.name = formData.name;
+    if (formData.slug !== originalFormData.slug) patch.slug = formData.slug;
+    if (formData.skuCode !== originalFormData.skuCode) patch.skuCode = formData.skuCode;
+    if (formData.description !== originalFormData.description) patch.description = formData.description;
+    if (formData.basePrice !== originalFormData.basePrice) patch.basePrice = Number(formData.basePrice);
+    if (formData.gender !== originalFormData.gender) patch.gender = formData.gender;
+    if (formData.releaseYear !== originalFormData.releaseYear) {
+      patch.releaseYear = formData.releaseYear ? Number(formData.releaseYear) : null;
+    }
+    if (formData.isActive !== originalFormData.isActive) patch.isActive = formData.isActive;
+    if (formData.categoryId !== originalFormData.categoryId) patch.categoryId = formData.categoryId || undefined;
+    if (formData.brandId !== originalFormData.brandId) patch.brandId = formData.brandId || undefined;
+
+    if (Object.keys(patch).length === 0) {
+      setSuccess('Tidak ada perubahan.');
+      setSaving(false);
+      return;
+    }
+
     try {
-      await productsApi.updateProduct(productId, {
-        name: formData.name,
-        slug: formData.slug,
-        skuCode: formData.skuCode,
-        description: formData.description,
-        basePrice: Number(formData.basePrice),
-        gender: formData.gender,
-        releaseYear: formData.releaseYear ? Number(formData.releaseYear) : null,
-        isActive: formData.isActive,
-        categoryId: formData.categoryId || undefined,
-        brandId: formData.brandId || undefined,
-      });
+      await productsApi.updateProduct(productId, patch);
       setSuccess('Produk berhasil diperbarui.');
       setTimeout(() => setSuccess(''), 4000);
       await fetchProduct();
@@ -203,8 +220,7 @@ export default function AdminProductEditPage() {
   // ─── Inline SKU handlers ─────────────────────────────────────────────────
 
   const handleEditSku = (sku: ProductSKU) => {
-    setEditingSkuId(sku.id);
-    setSkuEditForm({
+    const initial = {
       color: sku.color,
       colorHex: sku.colorHex || '#888888',
       sizeEU: String(sku.sizeEU),
@@ -213,27 +229,45 @@ export default function AdminProductEditPage() {
       sizeCM: sku.sizeCM ? String(sku.sizeCM) : '',
       price: sku.price ? String(sku.price) : '',
       stock: String(sku.stock),
-    });
+    };
+    setEditingSkuId(sku.id);
+    setOriginalSkuEditForm(initial);
+    setSkuEditForm(initial);
   };
 
   const handleSaveSku = async (skuId: string) => {
+    if (!originalSkuEditForm) return;
     setSaving(true);
     setError('');
+
+    // Build partial patch for SKU fields (exclude stock — handled separately)
+    const skuPatch: Record<string, unknown> = {};
+    if (skuEditForm.color !== originalSkuEditForm.color) skuPatch.color = skuEditForm.color;
+    if (skuEditForm.colorHex !== originalSkuEditForm.colorHex) skuPatch.colorHex = skuEditForm.colorHex;
+    if (skuEditForm.sizeEU !== originalSkuEditForm.sizeEU) skuPatch.sizeEU = Number(skuEditForm.sizeEU);
+    if (skuEditForm.sizeUS !== originalSkuEditForm.sizeUS) skuPatch.sizeUS = skuEditForm.sizeUS || undefined;
+    if (skuEditForm.sizeUK !== originalSkuEditForm.sizeUK) skuPatch.sizeUK = skuEditForm.sizeUK || undefined;
+    if (skuEditForm.sizeCM !== originalSkuEditForm.sizeCM) skuPatch.sizeCM = skuEditForm.sizeCM ? Number(skuEditForm.sizeCM) : undefined;
+    if (skuEditForm.price !== originalSkuEditForm.price) skuPatch.price = skuEditForm.price ? Number(skuEditForm.price) : undefined;
+
+    const stockChanged = skuEditForm.stock !== originalSkuEditForm.stock;
+
     try {
-      await productsApi.updateSku(skuId, {
-        color: skuEditForm.color,
-        colorHex: skuEditForm.colorHex,
-        sizeEU: Number(skuEditForm.sizeEU),
-        sizeUS: skuEditForm.sizeUS || undefined,
-        sizeUK: skuEditForm.sizeUK || undefined,
-        sizeCM: skuEditForm.sizeCM ? Number(skuEditForm.sizeCM) : undefined,
-        price: skuEditForm.price ? Number(skuEditForm.price) : undefined,
-      });
-      await productsApi.updateStock(skuId, { type: 'STOCK', stock: Number(skuEditForm.stock) });
+      // Only call updateSku if SKU fields changed
+      if (Object.keys(skuPatch).length > 0) {
+        await productsApi.updateSku(skuId, skuPatch);
+      }
+      // Only call updateStock if stock changed
+      if (stockChanged) {
+        await productsApi.updateStock(skuId, { type: 'STOCK', stock: Number(skuEditForm.stock) });
+      }
       setEditingSkuId(null);
-      setSuccess('SKU berhasil diperbarui.');
-      setTimeout(() => setSuccess(''), 4000);
-      await fetchProduct();
+      setOriginalSkuEditForm(null);
+      if (Object.keys(skuPatch).length > 0 || stockChanged) {
+        setSuccess('SKU berhasil diperbarui.');
+        setTimeout(() => setSuccess(''), 4000);
+        await fetchProduct();
+      }
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
     } finally {

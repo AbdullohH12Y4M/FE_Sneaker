@@ -5,12 +5,27 @@ import { categoriesApi } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/utils';
 import type { Category } from '@/types';
 
+// Build a partial patch payload — only include fields that changed
+function buildCategoryPatch(
+  original: Pick<Category, 'name' | 'slug' | 'isActive'> & { description?: string },
+  current: { name: string; slug: string; description: string; isActive: boolean }
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (current.name !== original.name) patch.name = current.name;
+  if (current.slug !== original.slug) patch.slug = current.slug;
+  if (current.description !== (original.description ?? '')) patch.description = current.description;
+  if (current.isActive !== original.isActive) patch.isActive = current.isActive;
+  return patch;
+}
+
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Store original values so we can diff on save
+  const [originalData, setOriginalData] = useState<{ name: string; slug: string; description: string; isActive: boolean } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -54,6 +69,7 @@ export default function AdminCategoriesPage() {
 
   const resetForm = () => {
     setFormData({ name: '', slug: '', description: '', isActive: true });
+    setOriginalData(null);
     setIsCreating(false);
     setEditingId(null);
   };
@@ -72,9 +88,17 @@ export default function AdminCategoriesPage() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingId) return;
+    if (!editingId || !originalData) return;
+
+    // Only send fields that actually changed
+    const patch = buildCategoryPatch(originalData, formData);
+    if (Object.keys(patch).length === 0) {
+      resetForm();
+      return;
+    }
+
     try {
-      await categoriesApi.update(editingId, formData);
+      await categoriesApi.update(editingId, patch);
       resetForm();
       fetchCategories();
     } catch (err: unknown) {
@@ -93,12 +117,14 @@ export default function AdminCategoriesPage() {
   };
 
   const startEdit = (cat: Category) => {
-    setFormData({
+    const initial = {
       name: cat.name,
       slug: cat.slug,
       description: cat.description || '',
       isActive: cat.isActive,
-    });
+    };
+    setOriginalData(initial);
+    setFormData(initial);
     setEditingId(cat.id);
     setIsCreating(false);
   };

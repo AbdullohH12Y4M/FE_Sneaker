@@ -5,12 +5,25 @@ import { brandsApi } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/utils';
 import type { Brand } from '@/types';
 
+function buildBrandPatch(
+  original: { name: string; slug: string; logoUrl: string; isActive: boolean },
+  current: { name: string; slug: string; logoUrl: string; isActive: boolean }
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (current.name !== original.name) patch.name = current.name;
+  if (current.slug !== original.slug) patch.slug = current.slug;
+  if (current.logoUrl !== original.logoUrl) patch.logoUrl = current.logoUrl || null;
+  if (current.isActive !== original.isActive) patch.isActive = current.isActive;
+  return patch;
+}
+
 export default function AdminBrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [originalData, setOriginalData] = useState<{ name: string; slug: string; logoUrl: string; isActive: boolean } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -39,6 +52,7 @@ export default function AdminBrandsPage() {
 
   const resetForm = () => {
     setFormData({ name: '', slug: '', logoUrl: '', isActive: true });
+    setOriginalData(null);
     setIsCreating(false);
     setEditingId(null);
   };
@@ -60,9 +74,16 @@ export default function AdminBrandsPage() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingId) return;
+    if (!editingId || !originalData) return;
+
+    const patch = buildBrandPatch(originalData, formData);
+    if (Object.keys(patch).length === 0) {
+      resetForm();
+      return;
+    }
+
     try {
-      await brandsApi.update(editingId, formData);
+      await brandsApi.update(editingId, patch);
       resetForm();
       fetchBrands();
     } catch (err: unknown) {
@@ -81,12 +102,14 @@ export default function AdminBrandsPage() {
   };
 
   const startEdit = (brand: Brand) => {
-    setFormData({
+    const initial = {
       name: brand.name,
       slug: brand.slug,
       logoUrl: brand.logoUrl ?? '',
       isActive: brand.isActive,
-    });
+    };
+    setOriginalData(initial);
+    setFormData(initial);
     setEditingId(brand.id);
     setIsCreating(false);
   };

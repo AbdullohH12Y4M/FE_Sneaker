@@ -7,12 +7,34 @@ import { formatPrice, extractErrorMessage } from '@/lib/utils';
 import type { Product, ProductSKU } from '@/types';
 import styles from './page.module.css';
 
+type SkuForm = {
+  color: string;
+  colorHex: string;
+  sizeEU: string;
+  sizeUS: string;
+  sizeUK: string;
+  sizeCM: string;
+  price: string;
+};
+
+function buildSkuPatch(original: SkuForm, current: SkuForm): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (current.color !== original.color) patch.color = current.color;
+  if (current.colorHex !== original.colorHex) patch.colorHex = current.colorHex;
+  if (current.sizeEU !== original.sizeEU) patch.sizeEU = Number(current.sizeEU);
+  if (current.sizeUS !== original.sizeUS) patch.sizeUS = current.sizeUS || undefined;
+  if (current.sizeUK !== original.sizeUK) patch.sizeUK = current.sizeUK || undefined;
+  if (current.sizeCM !== original.sizeCM) patch.sizeCM = current.sizeCM ? Number(current.sizeCM) : undefined;
+  if (current.price !== original.price) patch.price = current.price ? Number(current.price) : undefined;
+  return patch;
+}
+
 export default function AdminSkusPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingSku, setEditingSku] = useState<{ productId: string; sku: ProductSKU } | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SkuForm>({
     color: '',
     colorHex: '#888888',
     sizeEU: '',
@@ -21,6 +43,7 @@ export default function AdminSkusPage() {
     sizeCM: '',
     price: '',
   });
+  const [originalFormData, setOriginalFormData] = useState<SkuForm | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -41,22 +64,22 @@ export default function AdminSkusPage() {
 
   const resetForm = () => {
     setFormData({ color: '', colorHex: '#888888', sizeEU: '', sizeUS: '', sizeUK: '', sizeCM: '', price: '' });
+    setOriginalFormData(null);
     setEditingSku(null);
   };
 
   const handleUpdateSku = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSku) return;
+    if (!editingSku || !originalFormData) return;
+
+    const patch = buildSkuPatch(originalFormData, formData);
+    if (Object.keys(patch).length === 0) {
+      resetForm();
+      return;
+    }
+
     try {
-      await productsApi.updateSku(editingSku.sku.id, {
-        color: formData.color,
-        colorHex: formData.colorHex,
-        sizeEU: Number(formData.sizeEU),
-        sizeUS: formData.sizeUS || undefined,
-        sizeUK: formData.sizeUK || undefined,
-        sizeCM: formData.sizeCM ? Number(formData.sizeCM) : undefined,
-        price: formData.price ? Number(formData.price) : undefined,
-      });
+      await productsApi.updateSku(editingSku.sku.id, patch);
       resetForm();
       fetchProducts();
     } catch (err: any) {
@@ -65,8 +88,7 @@ export default function AdminSkusPage() {
   };
 
   const startEditSku = (productId: string, sku: ProductSKU) => {
-    setEditingSku({ productId, sku });
-    setFormData({
+    const initial: SkuForm = {
       color: sku.color,
       colorHex: sku.colorHex || '#888888',
       sizeEU: String(sku.sizeEU),
@@ -74,7 +96,10 @@ export default function AdminSkusPage() {
       sizeUK: sku.sizeUK ?? '',
       sizeCM: sku.sizeCM != null ? String(sku.sizeCM) : '',
       price: sku.price ? String(sku.price) : '',
-    });
+    };
+    setEditingSku({ productId, sku });
+    setOriginalFormData(initial);
+    setFormData(initial);
   };
 
   return (
