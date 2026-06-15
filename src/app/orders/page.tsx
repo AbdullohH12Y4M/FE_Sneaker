@@ -182,7 +182,25 @@ export default function OrdersPage() {
                     </div>
                   )}
 
-                  {/* Upload / re-upload button */}
+                  {/* Upload / re-upload button and Note */}
+                  {(!order.paymentProofUrl || order.status === 'WAITING_CONFIRMATION') && (
+                    <div style={{ marginTop: 10, marginBottom: 10 }}>
+                      <label className="form-label" htmlFor={`note-${order.id}`}>
+                        Catatan Tambahan (Opsional)
+                      </label>
+                      <textarea
+                        id={`note-${order.id}`}
+                        className="form-textarea form-input"
+                        rows={2}
+                        value={noteByOrderId[order.id] ?? ''}
+                        onChange={(e) =>
+                          setNoteByOrderId((prev) => ({ ...prev, [order.id]: e.target.value }))
+                        }
+                        placeholder="Transfer via BCA a/n Budi"
+                      />
+                    </div>
+                  )}
+
                   {!order.paymentProofUrl ? (
                     <>
                       <label className="btn btn-primary btn-sm" htmlFor={`proof-${order.id}`}>
@@ -204,23 +222,6 @@ export default function OrdersPage() {
                           <div className="upload-progress-bar"></div>
                         </div>
                       )}
-                    </>
-                  ) : (
-                      <div style={{ marginTop: 10 }}>
-                        <label className="form-label" htmlFor={`note-${order.id}`}>
-                          Catatan Tambahan (Opsional)
-                        </label>
-                        <textarea
-                          id={`note-${order.id}`}
-                          className="form-textarea form-input"
-                          rows={2}
-                          value={noteByOrderId[order.id] ?? ''}
-                          onChange={(e) =>
-                            setNoteByOrderId((prev) => ({ ...prev, [order.id]: e.target.value }))
-                          }
-                          placeholder="Transfer via BCA a/n Budi"
-                        />
-                      </div>
                     </>
                   ) : order.status === 'WAITING_CONFIRMATION' ? (
                     /* Allow re-upload when WAITING_CONFIRMATION */
