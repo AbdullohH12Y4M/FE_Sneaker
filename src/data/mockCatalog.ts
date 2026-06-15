@@ -1,4 +1,4 @@
-import type { Category } from '@/types';
+import type { Category, ProductImage } from '@/types';
 
 /** Kategori dummy — struktur selaras dengan respons BE. */
 export const mockCategories: Category[] = [
@@ -62,7 +62,7 @@ export type MockProductRecord = {
   createdAt: string;
   updatedAt: string;
   category: Category;
-  images: string[];
+  images: ProductImage[];
   skus: Array<{
     id: string;
     productId: string;
@@ -78,8 +78,19 @@ export type MockProductRecord = {
   }>;
 };
 
-function img(label: string, bg = '1a1a24', fg = 'f97316') {
+function img(label: string, bg = '1a1a24', fg = 'f97316'): string {
   return `https://placehold.co/600x600/${bg}/${fg}?text=${encodeURIComponent(label)}`;
+}
+
+/** Wrap a URL into a ProductImage-shaped object for mock data. */
+function mockImg(productId: string, label: string, bg = '1a1a24', fg = 'f97316', isPrimary = false): ProductImage {
+  return {
+    id: `img-${productId}-${label.replace(/\+/g, '-').toLowerCase()}`,
+    productId,
+    url: img(label, bg, fg),
+    isPrimary,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  };
 }
 
 /** Produk dummy lengkap dengan SKU & stok untuk uji checkout/admin. */
@@ -97,7 +108,10 @@ export const mockProductCatalog: MockProductRecord[] = [
     createdAt: '2025-01-15T08:00:00.000Z',
     updatedAt: '2025-01-15T08:00:00.000Z',
     category: mockCategories[0],
-    images: [img('Sneaker+Hitam'), img('Sneaker+Putih', 'f8fafc', '111827')],
+    images: [
+      mockImg('prod-1', 'Sneaker+Hitam', '1a1a24', 'f97316', true),
+      mockImg('prod-1', 'Sneaker+Putih', 'f8fafc', '111827'),
+    ],
     skus: [
       { id: 'sku-1', productId: 'prod-1', color: 'Hitam', colorHex: '#111827', sizeEU: 39, stock: 4, price: 249000 },
       { id: 'sku-2', productId: 'prod-1', color: 'Hitam', colorHex: '#111827', sizeEU: 42, stock: 2, price: 249000 },
@@ -117,7 +131,10 @@ export const mockProductCatalog: MockProductRecord[] = [
     createdAt: '2025-01-16T08:00:00.000Z',
     updatedAt: '2025-01-16T08:00:00.000Z',
     category: mockCategories[1],
-    images: [img('Kasual+Navy', '1e293b', 'ffffff'), img('Kasual+Coklat', '7c4d24', 'ffffff')],
+    images: [
+      mockImg('prod-2', 'Kasual+Navy', '1e293b', 'ffffff', true),
+      mockImg('prod-2', 'Kasual+Coklat', '7c4d24', 'ffffff'),
+    ],
     skus: [
       { id: 'sku-5', productId: 'prod-2', color: 'Navy', colorHex: '#1e293b', sizeEU: 38, stock: 5, price: 199000 },
       { id: 'sku-6', productId: 'prod-2', color: 'Navy', colorHex: '#1e293b', sizeEU: 40, stock: 2, price: 199000 },
@@ -136,7 +153,10 @@ export const mockProductCatalog: MockProductRecord[] = [
     createdAt: '2025-01-17T08:00:00.000Z',
     updatedAt: '2025-01-17T08:00:00.000Z',
     category: mockCategories[2],
-    images: [img('Formal+Hitam'), img('Formal+Abu', '6b7280', 'ffffff')],
+    images: [
+      mockImg('prod-3', 'Formal+Hitam', '1a1a24', 'f97316', true),
+      mockImg('prod-3', 'Formal+Abu', '6b7280', 'ffffff'),
+    ],
     skus: [
       { id: 'sku-8', productId: 'prod-3', color: 'Hitam', colorHex: '#111827', sizeEU: 42, stock: 2, price: 329000 },
       { id: 'sku-9', productId: 'prod-3', color: 'Abu', colorHex: '#6b7280', sizeEU: 41, stock: 1, price: 329000 },
@@ -154,7 +174,10 @@ export const mockProductCatalog: MockProductRecord[] = [
     createdAt: '2025-01-18T08:00:00.000Z',
     updatedAt: '2025-01-18T08:00:00.000Z',
     category: mockCategories[3],
-    images: [img('Sandal+Hitam', '4b5563', 'ffffff'), img('Sandal+Kuning', 'f59e0b', '111827')],
+    images: [
+      mockImg('prod-4', 'Sandal+Hitam', '4b5563', 'ffffff', true),
+      mockImg('prod-4', 'Sandal+Kuning', 'f59e0b', '111827'),
+    ],
     skus: [
       { id: 'sku-10', productId: 'prod-4', color: 'Hitam', colorHex: '#111827', sizeEU: 39, stock: 7, price: 89000 },
       { id: 'sku-11', productId: 'prod-4', color: 'Coklat', colorHex: '#7c4d24', sizeEU: 40, stock: 4, price: 89000 },
@@ -172,7 +195,7 @@ export const mockProductCatalog: MockProductRecord[] = [
     createdAt: '2025-01-19T08:00:00.000Z',
     updatedAt: '2025-01-19T08:00:00.000Z',
     category: mockCategories[4],
-    images: [img('Boots+Hijau', '14532d', 'ffffff')],
+    images: [mockImg('prod-5', 'Boots+Hijau', '14532d', 'ffffff', true)],
     skus: [
       { id: 'sku-12', productId: 'prod-5', color: 'Hijau', colorHex: '#16a34a', sizeEU: 41, stock: 3, price: 279000 },
       { id: 'sku-13', productId: 'prod-5', color: 'Hitam', colorHex: '#111827', sizeEU: 43, stock: 2, price: 279000 },
@@ -191,7 +214,7 @@ export const mockProductCatalog: MockProductRecord[] = [
     createdAt: '2025-01-20T08:00:00.000Z',
     updatedAt: '2025-01-20T08:00:00.000Z',
     category: mockCategories[0],
-    images: [img('Runner+Biru', '1d4ed8', 'ffffff')],
+    images: [mockImg('prod-6', 'Runner+Biru', '1d4ed8', 'ffffff', true)],
     skus: [
       { id: 'sku-14', productId: 'prod-6', color: 'Biru', colorHex: '#2563eb', sizeEU: 40, stock: 8, price: 319000 },
       { id: 'sku-15', productId: 'prod-6', color: 'Biru', colorHex: '#2563eb', sizeEU: 42, stock: 5, price: 319000 },

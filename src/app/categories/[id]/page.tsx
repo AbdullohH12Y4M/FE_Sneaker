@@ -5,21 +5,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { categoriesApi, productsApi } from '@/lib/api';
 import { parseProductsList } from '@/lib/api-helpers';
-import type { Category } from '@/types';
+import type { Category, Product } from '@/types';
 import ProductCard from '@/components/shop/ProductCard';
 import styles from './page.module.css';
-
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  basePrice: number;
-  discount?: number;
-  category: string;
-  images: string[];
-  skus: any[];
-}
 
 export default function CategoryDetailPage() {
   const params = useParams<{ id: string }>();
@@ -43,7 +31,7 @@ export default function CategoryDetailPage() {
       const prodRes = await productsApi.getAllPublic({
         categorySlug: cat.slug,
       });
-      setProducts(parseProductsList(prodRes.data) as Product[]);
+      setProducts(parseProductsList(prodRes.data));
       setError('');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Gagal memuat data kategori.');
@@ -110,7 +98,7 @@ export default function CategoryDetailPage() {
       ) : (
         <div className={styles.categoryProductsGrid}>
           {products.map((product, index) => (
-            <ProductCard key={product.id ?? product.slug ?? index} product={product as any} index={index} />
+            <ProductCard key={product.id ?? product.slug ?? index} product={product} index={index} />
           ))}
         </div> 
       )}

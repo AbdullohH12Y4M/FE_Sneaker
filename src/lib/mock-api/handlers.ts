@@ -45,10 +45,21 @@ function withInventory(skus: MockProductRecord['skus']) {
 function enrichProduct(p: MockProductRecord) {
   const state = getMockState();
   const category = state.categories.find((c) => c.id === p.categoryId) ?? p.category;
+  // Build images: use stored ProductImage objects; fallback to imageUrl if images is empty
+  let images: MockProductRecord['images'] = p.images?.length ? p.images : [];
+  if (!images.length && p.imageUrl) {
+    images = [{
+      id: `img-${p.id}-fallback`,
+      productId: p.id,
+      url: p.imageUrl,
+      isPrimary: true,
+      createdAt: '',
+    }];
+  }
   return {
     ...p,
     category,
-    images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
+    images,
     skus: withInventory(p.skus),
   };
 }
@@ -249,7 +260,9 @@ export const mockHandlers = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       category,
-      images: body.imageUrl ? [String(body.imageUrl)] : [],
+      images: body.imageUrl
+        ? [{ id: nextId('img'), productId: '', url: String(body.imageUrl), isPrimary: true, createdAt: new Date().toISOString() }]
+        : [],
       skus: [],
     };
     state.products.unshift(product);
@@ -325,11 +338,11 @@ export const mockHandlers = {
     if (!product) return fail('Product not found', 404);
     const url = `https://placehold.co/600x600/1a1a24/f97316?text=${encodeURIComponent(product.name)}`;
     const imageId = nextId('img');
+    const newImage = { id: imageId, productId: id, url, isPrimary: product.images.length === 0, createdAt: new Date().toISOString() };
     product.imageUrl = url;
-    // Store as ProductImage-shaped objects so normalizeProduct can carry the id field through
-    product.images = [{ id: imageId, productId: id, url, isPrimary: true } as unknown as string];
+    product.images = [...product.images, newImage];
     setMockState(state);
-    return ok({ imageUrl: url, productImage: { id: imageId, productId: id, url, isPrimary: true } });
+    return ok({ imageUrl: url, productImage: newImage });
   },
 
   listBrands: (params?: Record<string, unknown>) => {
