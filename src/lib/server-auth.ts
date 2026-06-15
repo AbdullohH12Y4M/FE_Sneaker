@@ -34,6 +34,18 @@ export async function requireAdmin(req?: NextRequest): Promise<SessionUser | Nex
   return user;
 }
 
+/** Requires ADMIN or STAFF role. Returns 401/403 if not permitted. */
+export async function requireAdminOrStaff(req?: NextRequest): Promise<SessionUser | NextResponse> {
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json({ success: false, message: 'Unauthorized', statusCode: 401 }, { status: 401 });
+  }
+  if (!['ADMIN', 'STAFF'].includes(user.role)) {
+    return NextResponse.json({ success: false, message: 'Forbidden', statusCode: 403 }, { status: 403 });
+  }
+  return user;
+}
+
 /** Type guard: check if the result is a NextResponse (error) */
 export function isErrorResponse(val: unknown): val is NextResponse {
   return val instanceof NextResponse;

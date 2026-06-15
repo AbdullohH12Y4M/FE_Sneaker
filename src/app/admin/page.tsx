@@ -9,7 +9,7 @@ import styles from './page.module.css';
 
 import type { Order, OrderStatus } from '@/types';
 
-const ORDER_STATUSES = ['PENDING', 'WAITING_CONFIRMATION', 'PAID', 'SHIPPED', 'CANCELLED'];
+const ORDER_STATUSES = ['PENDING', 'WAITING_CONFIRMATION', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
 export default function AdminPage() {
   const { data: session } = useSession();
@@ -21,7 +21,8 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
 
   const fetchOrders = useCallback(async () => {
-    if (!session?.user || session.user.role !== 'ADMIN') {
+    const role = session?.user?.role;
+    if (!session?.user || !['ADMIN', 'STAFF'].includes(role ?? '')) {
       setLoading(false);
       return;
     }
@@ -82,7 +83,7 @@ export default function AdminPage() {
     }
   };
 
-  if (!session || session.user.role !== 'ADMIN') {
+  if (!session || !['ADMIN', 'STAFF'].includes(session.user?.role ?? '')) {
     return null;
   }
 

@@ -96,18 +96,20 @@ export async function middleware(request: NextRequest) {
   const session = token ? await verifySessionToken(token) : null;
 
   const isLoggedIn = !!session?.user?.id;
-  const isAdmin = session?.user?.role === 'ADMIN';
+  // Allow both ADMIN and STAFF to access /admin routes.
+  // STAFF role exists in the DB schema and admin layout already supports it —
+  // this middleware was the only blocker preventing STAFF from reaching /admin.
+  const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(session?.user?.role ?? '');
 
-  // ── Admin routes: require authenticated ADMIN ────────────────────────────
+  // ── Admin routes: require authenticated ADMIN or STAFF ───────────────────
   if (pathname.startsWith('/admin')) {
     if (!isLoggedIn) {
       const loginUrl = new URL('/login', request.nextUrl);
       loginUrl.searchParams.set('callbackUrl', '/admin');
       return NextResponse.redirect(loginUrl);
     }
-    if (!isAdmin) {
-      // Authenticated but not admin — redirect to home, not to an error page
-      // so as not to leak that the /admin route exists.
+    if (!isStaffOrAdmin) {
+      // Authenticated but not admin/staff — redirect to home
       return NextResponse.redirect(new URL('/', request.nextUrl));
     }
   }

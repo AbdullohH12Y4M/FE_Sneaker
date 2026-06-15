@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import {
   FiSearch,
@@ -15,20 +15,19 @@ import {
 } from 'react-icons/fi';
 import { useCartStore } from '@/store/cart';
 import { productsApi } from '@/lib/api';
+import { parseProductsList } from '@/lib/api-helpers';
 import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './Navbar.module.css';
+import type { Product } from '@/types';
 
-const NAV_LINKS = [
-  { href: '/', label: 'Beranda' },
-  { href: '/?category=SNEAKERS', label: 'Sneakers' },
-  { href: '/?category=CASUAL', label: 'Kasual' },
-  { href: '/?category=FORMAL', label: 'Formal' },
-  { href: '/?category=SANDAL', label: 'Sandal' },
-];
+// Static home link — categories are fetched dynamically at runtime
+const HOME_LINK = { href: '/', label: 'Beranda' };
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const getTotalItems = useCartStore((s) => s.getTotalItems);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -38,8 +37,11 @@ export default function Navbar() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // Dynamic categories fetched from API
+  const [navCategories, setNavCategories] = useState<{ href: string; label: string }[]>([]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -51,25 +53,51 @@ export default function Navbar() {
     setMobileOpen(false);
   }, [pathname]);
 
+  // Fetch categories once on mount — graceful degradation on failure
+  useEffect(() => {
+    import('@/lib/api').then(({ categoriesApi }) => {
+      categoriesApi.getAll()
+        .then((res) => {
+          const data = res.data?.data ?? res.data?.items ?? res.data ?? [];
+          if (Array.isArray(data)) {
+            const links = data
+              .filter((c: any) => c?.isActive !== false)
+              .map((c: any) => ({
+                href: `/?category=${String(c.slug ?? c.name ?? '').toUpperCase()}`,
+                label: String(c.name ?? c.slug ?? ''),
+              }));
+            setNavCategories(links);
+          }
+        })
+        .catch(() => {
+          // Graceful degradation — no categories shown, no error message
+        });
+    });
+  }, []);
+
+  // Helper: determine if a nav link is active (handles ?category= param correctly)
+  const isLinkActive = (href: string) => {
+    const url = new URL(href, 'http://x');
+    if (url.pathname !== pathname) return false;
+    const cat = url.searchParams.get('category');
+    if (cat) return searchParams.get('category') === cat;
+    // Home link is active only when no category filter is active
+    return !searchParams.get('category');
+  };
+
   const fetchSearch = useCallback(async (query: string) => {
-    const trimmed = query.trim().toLowerCase();
+    const trimmed = query.trim();
     if (!trimmed) {
       setSearchResults([]);
       return;
     }
     setSearching(true);
     try {
-      const res = await productsApi.getAll();
-      const all = res.data?.products ?? res.data?.items ?? res.data?.itemsList ?? res.data ?? [];
-      const list = Array.isArray(all) ? all : [];
-      const matched = list
-        .filter((p: any) => {
-          const name = String(p.name ?? '').toLowerCase();
-          const desc = String(p.description ?? '').toLowerCase();
-          return name.includes(trimmed) || desc.includes(trimmed);
-        })
-        .slice(0, 5);
-      setSearchResults(matched);
+      // getAllPublic hits /api/products/all — includes images and SKUs
+      // parseProductsList normalizes both string[] and [{id,url}] image formats
+      const res = await productsApi.getAllPublic({ q: trimmed, limit: 5 });
+      const items = parseProductsList(res.data);
+      setSearchResults(items);
     } catch {
       setSearchResults([]);
     } finally {
@@ -98,13 +126,19 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <nav className={styles.desktopNav}>
-            {NAV_LINKS.map((link) => (
+            {/* Home link */}
+            <Link
+              href={HOME_LINK.href}
+              className={`${styles.navLink} ${isLinkActive(HOME_LINK.href) ? styles.navLinkActive : ''}`}
+            >
+              {HOME_LINK.label}
+            </Link>
+            {/* Dynamic category links */}
+            {navCategories.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`${styles.navLink} ${
-                  pathname === link.href ? styles.navLinkActive : ''
-                }`}
+                className={`${styles.navLink} ${isLinkActive(link.href) ? styles.navLinkActive : ''}`}
               >
                 {link.label}
               </Link>
@@ -123,6 +157,13 @@ export default function Navbar() {
                     placeholder="Cari sepatu..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && searchQuery.trim()) {
+                        router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                        setIsSearchOpen(false);
+                        setSearchQuery('');
+                      }
+                    }}
                     autoFocus
                   />
                   <button className={styles.searchClose} onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}>
@@ -130,18 +171,30 @@ export default function Navbar() {
                   </button>
                   {searchQuery && (
                     <div className={styles.searchResults}>
-                      {searchResults.length > 0 ? (
-                        searchResults.map((p) => (
-                          <Link key={p.id} href={`/products/${p.slug}`} className={styles.searchItem} onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}>
-                            <img src={p.images?.[0]} alt={p.name} className={styles.searchItemImage} />
-                            <div>
-                              <div className={styles.searchItemName}>{p.name}</div>
-                              <div className={styles.searchItemPrice}>{`Rp${Number(p.basePrice ?? 0).toLocaleString('id-ID')}`}</div>
-                            </div>
+                      {searching ? (
+                        <div className={styles.searchEmpty}>Mencari...</div>
+                      ) : searchResults.length > 0 ? (
+                        <>
+                          {searchResults.map((p) => (
+                            <Link key={p.id} href={`/products/${p.slug}`} className={styles.searchItem} onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}>
+                              <img src={p.images?.[0] ?? '/placeholder-shoes.png'} alt={p.name} className={styles.searchItemImage} />
+                              <div>
+                                <div className={styles.searchItemName}>{p.name}</div>
+                                <div className={styles.searchItemPrice}>{`Rp${Number(p.basePrice ?? 0).toLocaleString('id-ID')}`}</div>
+                              </div>
+                            </Link>
+                          ))}
+                          <Link
+                            href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                            className={styles.searchItem}
+                            style={{ justifyContent: 'center', fontWeight: 500 }}
+                            onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}
+                          >
+                            Lihat semua hasil untuk &ldquo;{searchQuery}&rdquo;
                           </Link>
-                        ))
+                        </>
                       ) : (
-                        <div className={styles.searchEmpty}>{searching ? 'Mencari...' : `Tidak ada hasil untuk "${searchQuery}"`}</div>
+                        <div className={styles.searchEmpty}>{`Tidak ada hasil untuk "${searchQuery}"`}</div>
                       )}
                     </div>
                   )}
@@ -208,7 +261,7 @@ export default function Navbar() {
                        <Link href="/profile" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
                          <FiUser size={16} /> Profil Saya
                        </Link>
-                      {session.user?.role === 'ADMIN' && (
+                      {(session.user?.role === 'ADMIN' || session.user?.role === 'STAFF') && (
                         <Link href="/admin" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
                           <FiSettings size={16} /> Dashboard Admin
                         </Link>
@@ -265,7 +318,12 @@ export default function Navbar() {
             transition={{ duration: 0.25 }}
           >
             <div className={styles.mobileLinks}>
-              {NAV_LINKS.map((link) => (
+              {/* Home link */}
+              <Link href={HOME_LINK.href} className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                {HOME_LINK.label}
+              </Link>
+              {/* Dynamic category links */}
+              {navCategories.map((link) => (
                 <Link key={link.href} href={link.href} className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
                   {link.label}
                 </Link>
@@ -279,7 +337,7 @@ export default function Navbar() {
                   <Link href="/profile" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
                     <FiUser size={16} /> Profil Saya
                   </Link>
-                  {session.user?.role === 'ADMIN' && (
+                  {(session.user?.role === 'ADMIN' || session.user?.role === 'STAFF') && (
                     <Link href="/admin" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
                       <FiSettings size={16} /> Dashboard Admin
                     </Link>

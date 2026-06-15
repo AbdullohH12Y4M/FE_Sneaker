@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin, isErrorResponse } from '@/lib/server-auth';
+import { requireAdminOrStaff, isErrorResponse } from '@/lib/server-auth';
 
-// GET /api/orders/admin/export — admin only, export transactions to various formats
+// GET /api/orders/admin/export — admin or staff, export transactions
 export async function GET(req: NextRequest) {
-  const authResult = await requireAdmin(req);
+  const authResult = await requireAdminOrStaff(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

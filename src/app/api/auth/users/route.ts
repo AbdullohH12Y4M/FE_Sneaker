@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin, isErrorResponse } from '@/lib/server-auth';
+import { requireAdminOrStaff, isErrorResponse } from '@/lib/server-auth';
 
 export async function GET(req: NextRequest) {
-  const authResult = await requireAdmin(req);
+  const authResult = await requireAdminOrStaff(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

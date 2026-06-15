@@ -1,5 +1,5 @@
 'use client';
-// asuuu
+
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -7,16 +7,15 @@ import { productsApi } from '@/lib/api';
 import { parseProductsList } from '@/lib/api-helpers';
 import FilterSidebar from '@/components/shop/FilterSidebar';
 import ProductCard from '@/components/shop/ProductCard';
-import { mockProducts } from '@/data/mockProducts';
+import type { Product } from '@/types';
 import styles from './page.module.css';
 
 function HomeContent() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [filterColors, setFilterColors] = useState<{ name: string; hex: string }[]>([]);
   const [filterSizes, setFilterSizes] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFromMock, setIsFromMock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const params = useSearchParams();
@@ -25,7 +24,8 @@ function HomeContent() {
   const size = Number(params.get('size') ?? '0');
   const minPrice = Number(params.get('minPrice') ?? '0');
   const maxPrice = Number(params.get('maxPrice') ?? '0');
-  const search = params.get('search')?.toLowerCase() ?? '';
+  // Support both ?q= (from Navbar search) and ?search= (from filter sidebar)
+  const search = (params.get('q') ?? params.get('search') ?? '').toLowerCase();
 
   useEffect(() => {
     let mounted = true;
@@ -33,34 +33,23 @@ function HomeContent() {
     async function load() {
       setIsLoading(true);
       setError(null);
-      setIsFromMock(false);
 
       try {
         const response = await productsApi.listCatalog();
-        const categoriesFromApi =
-          response.data && typeof response.data === 'object' && !Array.isArray(response.data)
-            ? (response.data as { categories?: unknown[] }).categories ?? []
-            : [];
+        const normalizedProducts = parseProductsList(response.data);
 
-        const normalizedProducts = parseProductsList(response.data).map((p) => ({
-          ...p,
-          _mock: false,
-        }));
-
-        const categoriesNormalized =
-          Array.isArray(categoriesFromApi) && categoriesFromApi.length
-            ? (categoriesFromApi.map((c: any) =>
-                typeof c === 'string' ? c : (c?.name ?? c?.slug ?? null)
-              ).filter(Boolean) as string[])
-            : (Array.from(new Set(normalizedProducts.map((p: any) => p.category).filter(Boolean))) as string[]);
-
-        const uniqueCategories = Array.from(new Set(categoriesNormalized)) as string[];
+        const uniqueCategories = Array.from(
+          new Set(normalizedProducts.map((p) => {
+            const cat = p.category;
+            return typeof cat === 'string' ? cat : null;
+          }).filter(Boolean))
+        ) as string[];
 
         // Extract unique colors and sizes from all SKUs for dynamic filter
-        const colorMap = new Map<string, string>(); // name → hex
+        const colorMap = new Map<string, string>();
         const sizeSet = new Set<number>();
-        normalizedProducts.forEach((p: any) => {
-          (p.skus || []).forEach((sku: any) => {
+        normalizedProducts.forEach((p) => {
+          (p.skus || []).forEach((sku) => {
             if (sku.color) colorMap.set(sku.color, sku.colorHex || '#888888');
             if (sku.sizeEU) sizeSet.add(sku.sizeEU);
           });
@@ -74,20 +63,10 @@ function HomeContent() {
         setFilterColors(uniqueColors);
         setFilterSizes(uniqueSizes);
         setIsLoading(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!mounted) return;
-
-        const mockWithFilter = mockProducts.map((p) => ({
-          ...p,
-          images: p.images && p.images.length > 0 ? p.images : ['/placeholder-shoes.png'],
-          category: (typeof p.category === 'string' ? p.category : (p.category as any)?.name ?? (p.category as any)?.slug) || 'Uncategorized',
-          _mock: true,
-        }));
-
-        setProducts(mockWithFilter);
-        setCategories(Array.from(new Set(mockWithFilter.map((p: any) => p.category).filter(Boolean))) as string[]);
-        setIsFromMock(true);
-        setError('Menampilkan data demo (backend belum terhubung)');
+        setError('Gagal memuat produk. Coba refresh halaman.');
+        setProducts([]);
         setIsLoading(false);
       }
     }
@@ -99,11 +78,11 @@ function HomeContent() {
   }, []);
 
   const displayProducts = useMemo(() => {
-    return products.filter((product: any) => {
-      const availableSkus = (product.skus || []).filter((sku: any) => sku.stock > 0);
+    return products.filter((product) => {
+      const availableSkus = (product.skus || []).filter((sku) => sku.stock > 0);
       if (!availableSkus.length) return false;
 
-      // Category filter: case-insensitive match against category name
+      // Category filter: case-insensitive
       if (category) {
         const productCategory = String(product.category ?? '');
         if (productCategory.toLowerCase() !== category.toLowerCase()) return false;
@@ -117,14 +96,14 @@ function HomeContent() {
       }
 
       // Color filter: exact match against SKU color value from server
-      if (color && !availableSkus.some((sku: any) => sku.color === color)) return false;
+      if (color && !availableSkus.some((sku) => sku.color === color)) return false;
 
       // Size filter: exact match against EU size
-      if (size && !availableSkus.some((sku: any) => Number(sku.sizeEU) === size)) return false;
+      if (size && !availableSkus.some((sku) => Number(sku.sizeEU) === size)) return false;
 
-      // Price filter: check SKU price or product basePrice
-      if (minPrice && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) >= minPrice)) return false;
-      if (maxPrice && maxPrice > 0 && !availableSkus.some((sku: any) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
+      // Price filter
+      if (minPrice && !availableSkus.some((sku) => (sku.price ?? product.basePrice) >= minPrice)) return false;
+      if (maxPrice && maxPrice > 0 && !availableSkus.some((sku) => (sku.price ?? product.basePrice) <= maxPrice)) return false;
 
       return true;
     });
@@ -137,9 +116,7 @@ function HomeContent() {
           <span className={styles.heroBadge}>SneakerLocal</span>
           <h1 className={styles.heroTitle}>Sepatu lokal Malang, varian warna dan ukuran lengkap.</h1>
           <p className={styles.heroText}>
-            {isFromMock
-              ? 'Menampilkan data demo. Setelah backend aktif, harga dan stok akan ter-update otomatis.'
-              : 'Jelajahi katalog sepatu untuk mahasiswa: sneakers, kasual, formal, dan sandal dengan filter harga, ukuran, warna, dan stok tersedia.'}
+            Jelajahi katalog sepatu untuk mahasiswa: sneakers, kasual, formal, dan sandal dengan filter harga, ukuran, warna, dan stok tersedia.
           </p>
           <div className={styles.heroActions}>
             <Link href="/cart" className="btn btn-primary btn-lg">
@@ -161,12 +138,8 @@ function HomeContent() {
       <section className="container">
         <div className={styles.sectionHeader}>
           <div>
-            <p className={styles.sectionLabel}>
-              {isFromMock ? 'Produk Demo' : 'Katalog Produk'}
-            </p>
-            <h2 className={styles.sectionTitle}>
-              {isFromMock ? 'Koleksi contoh untukPreview' : 'Temukan sepatu sesuai kantong mahasiswa'}
-            </h2>
+            <p className={styles.sectionLabel}>Katalog Produk</p>
+            <h2 className={styles.sectionTitle}>Temukan sepatu sesuai kantong mahasiswa</h2>
           </div>
           <p className={styles.sectionMeta}>
             {isLoading
@@ -175,15 +148,7 @@ function HomeContent() {
           </p>
         </div>
 
-        {isFromMock && (
-          <div className="card" style={{ padding: '12px 16px', marginBottom: '20px', borderLeft: '4px solid var(--color-warning)' }}>
-            <p className="text-muted" style={{ margin: 0 }}>
-              ⚠️ <strong>Mode Demo:</strong> Menampilkan data contoh. Setelah backend terhubung, data akan otomatis diperbarui dari server.
-            </p>
-          </div>
-        )}
-
-        {error && !isFromMock && (
+        {error && (
           <div className="card" style={{ padding: '12px 16px', marginBottom: '20px' }}>
             <p className="form-error" style={{ margin: 0 }}>{error}</p>
           </div>

@@ -24,7 +24,10 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const subtotal = getTotalPrice();
-  const total = subtotal; // BE calculates shipping fee from DB
+  // Flat shipping fee matching backend AppSetting — Rp10.000 per delivery
+  const FLAT_SHIPPING_FEE = 10_000;
+  const estimatedShipping = shippingType === 'DELIVERY' ? FLAT_SHIPPING_FEE : 0;
+  const estimatedTotal = subtotal + estimatedShipping;
 
   const canSubmit = items.length > 0 && (shippingType === 'PICKUP' || address.trim().length > 5);
 
@@ -190,17 +193,25 @@ export default function CheckoutPage() {
             <div className="card" style={{ padding: '24px' }}>
               <h2>Ringkasan Pesanan</h2>
               <div className={styles.summaryItem}>
-                <span>Subtotal</span>
+                <span>Subtotal Produk</span>
                 <strong>{formatPrice(subtotal)}</strong>
               </div>
               <div className={styles.summaryItem}>
                 <span>Ongkir</span>
-                <span className="text-muted">Dihitung otomatis</span>
+                {shippingType === 'DELIVERY'
+                  ? <span>{formatPrice(FLAT_SHIPPING_FEE)}</span>
+                  : <span className="text-muted">Rp0 (Ambil Sendiri)</span>
+                }
               </div>
               <div className={styles.summaryTotal}>
-                <span>Total Bayar</span>
-                <strong>{formatPrice(total)}</strong>
+                <span>Estimasi Total</span>
+                <strong>{formatPrice(estimatedTotal)}</strong>
               </div>
+              {shippingType === 'DELIVERY' && (
+                <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  Total final dikonfirmasi setelah pesanan dibuat.
+                </p>
+              )}
 
               <div className={styles.helpBox}>
                 <p className="font-medium">Pembayaran</p>

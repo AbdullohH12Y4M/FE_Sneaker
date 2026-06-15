@@ -16,6 +16,8 @@ export default function OrdersPage() {
   const [error, setError] = useState('');
   const [uploadingOrder, setUploadingOrder] = useState<string | null>(null);
   const [noteByOrderId, setNoteByOrderId] = useState<Record<string, string>>({});
+  // Confirmation modal state for cancel action
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
   const loadOrders = async () => {
     const response = await ordersApi.getMyOrders();
@@ -220,15 +222,7 @@ export default function OrdersPage() {
                   <button
                     type="button"
                     className="btn btn-danger btn-sm"
-                    onClick={async () => {
-                      if (!confirm(`Batalkan pesanan #${order.id}?`)) return;
-                      try {
-                        await ordersApi.deleteOrder(order.id);
-                        setOrders((prev) => prev.filter((o) => o.id !== order.id));
-                      } catch {
-                        alert('Gagal membatalkan pesanan.');
-                      }
-                    }}
+                    onClick={() => setCancelConfirmId(order.id)}
                   >
                     Batalkan Pesanan
                   </button>

@@ -13,7 +13,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return <div className="container" style={{ padding: '40px 0', textAlign: 'center' }}>Memuat Admin Panel...</div>;
   }
 
-  if (!session || session.user?.role !== 'ADMIN') {
+  // Middleware — block STAFF too based on session role only allows ADMIN
+  // But middleware uses access_token JWT, admin layout uses NextAuth session
+  if (!session || (session.user?.role !== 'ADMIN' && session.user?.role !== 'STAFF')) {
     return (
       <div className="container" style={{ padding: '40px 0' }}>
         <div style={{ textAlign: 'center', padding: '40px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-xl)' }}>

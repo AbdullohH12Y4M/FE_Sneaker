@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin, isErrorResponse } from '@/lib/server-auth';
+import { requireAdminOrStaff, isErrorResponse } from '@/lib/server-auth';
 
 type Params = { params: Promise<{ skuId: string }> };
 
-// PATCH /api/inventories/[skuId] — admin, update stock
+// PATCH /api/inventories/[skuId] — admin or staff, update stock
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin(req);
+  const authResult = await requireAdminOrStaff(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {

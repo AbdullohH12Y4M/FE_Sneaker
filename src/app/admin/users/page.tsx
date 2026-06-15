@@ -7,9 +7,9 @@ import { extractErrorMessage } from '@/lib/utils';
 interface User {
   id: string;
   email: string;
-  role: 'CUSTOMER' | 'ADMIN';
+  name: string | null;
+  role: 'CUSTOMER' | 'ADMIN' | 'STAFF';
   createdAt: string;
-  updatedAt: string;
 }
 
 export default function AdminUsersPage() {
@@ -53,6 +53,7 @@ export default function AdminUsersPage() {
               <tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '16px', fontWeight: 600, color: 'var(--color-text-muted)' }}>ID</th>
                 <th style={{ padding: '16px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Email</th>
+                <th style={{ padding: '16px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Nama</th>
                 <th style={{ padding: '16px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Role</th>
                 <th style={{ padding: '16px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Terdaftar</th>
               </tr>
@@ -62,8 +63,9 @@ export default function AdminUsersPage() {
                 <tr key={user.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                   <td style={{ padding: '16px', fontSize: '0.85rem' }}>...{user.id.substring(user.id.length - 8)}</td>
                   <td style={{ padding: '16px', fontWeight: 500 }}>{user.email}</td>
+                  <td style={{ padding: '16px' }}>{user.name ?? <span className="text-muted">-</span>}</td>
                   <td style={{ padding: '16px' }}>
-                    <span className={`badge ${user.role === 'ADMIN' ? 'badge-warning' : 'badge-info'}`}>
+                    <span className={`badge ${user.role === 'ADMIN' ? 'badge-warning' : user.role === 'STAFF' ? 'badge-info' : 'badge-primary'}`}>
                       {user.role}
                     </span>
                   </td>

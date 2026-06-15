@@ -53,7 +53,12 @@ export default function OrderDetailPage() {
     try {
       setUploading(true);
       await ordersApi.uploadProof(id, file, uploadNote);
-      await loadOrder();
+      // Wrap loadOrder in try-catch so an error here doesn't leave UI in broken state
+      try {
+        await loadOrder();
+      } catch (reloadErr: unknown) {
+        setError(extractErrorMessage(reloadErr));
+      }
       setNote('');
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
@@ -94,7 +99,10 @@ export default function OrderDetailPage() {
     );
   }
 
-  const canUploadProof = order.status === 'PENDING' && !order.paymentProofUrl;
+  // Upload proof: allowed when PENDING (first upload) or WAITING_CONFIRMATION (re-upload)
+  const canUploadProof =
+    (order.status === 'PENDING' && !order.paymentProofUrl) ||
+    order.status === 'WAITING_CONFIRMATION';
 
   return (
     <div className="container" style={{ padding: '40px 0' }}>
@@ -138,11 +146,22 @@ export default function OrderDetailPage() {
           ))}
         </section>
 
+        {order.status === 'PAID' && (
+          <section className="card" style={{ padding: 24, borderLeft: '4px solid var(--color-success)' }}>
+            <p className="font-medium" style={{ color: 'var(--color-success)' }}>✓ Pembayaran sudah diverifikasi</p>
+          </section>
+        )}
+
         {canUploadProof && (
           <section className="card" style={{ padding: 24 }}>
-            <h2>Bukti Pembayaran</h2>
+            <h2>{order.status === 'WAITING_CONFIRMATION' ? 'Ganti Bukti Pembayaran' : 'Bukti Pembayaran'}</h2>
+            {order.status === 'WAITING_CONFIRMATION' && (
+              <p className="text-muted" style={{ marginBottom: 12 }}>
+                Bukti pembayaran sedang diverifikasi admin. Upload baru akan menggantikan bukti sebelumnya.
+              </p>
+            )}
             <label className="btn btn-primary btn-sm" htmlFor={`proof-${order.id}`}>
-              {uploading ? 'Mengunggah...' : 'Unggah Bukti Transfer'}
+              {uploading ? 'Mengunggah...' : order.status === 'WAITING_CONFIRMATION' ? 'Ganti Bukti Transfer' : 'Unggah Bukti Transfer'}
               <input
                 id={`proof-${order.id}`}
                 type="file"
