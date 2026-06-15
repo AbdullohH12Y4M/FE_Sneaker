@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin, isErrorResponse } from '@/lib/server-auth';
+import { requireAdminOrStaff, isErrorResponse } from '@/lib/server-auth';
+import { v2 as cloudinary } from 'cloudinary';
 
 type Params = { params: Promise<{ slug: string }> };
 
+/** Lazy Cloudinary config — reads env vars at request time, not module load time. */
+function getCloudinary() {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  return cloudinary;
+}
+
 /**
  * POST /api/products/[id]/image
- * Upload product image to Supabase Storage and create a ProductImage record.
- * The [slug] param is treated as an ID for mutations.
+ * Upload product image to Cloudinary and create a ProductImage record.
+ * The [slug] param is treated as a product ID for mutations.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin(req);
+  const authResult = await requireAdminOrStaff(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {
@@ -29,30 +40,38 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const isPrimary = formData.get('isPrimary') === 'true';
 
-    // Upload to Supabase Storage
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-    );
-
-    const ext = file.name.split('.').pop() ?? 'jpg';
-    const fileName = `products/${id}-${Date.now()}.${ext}`;
+    // Upload to Cloudinary
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const safeMimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
+    const base64File = `data:${safeMimeType};base64,${buffer.toString('base64')}`;
 
+    const cld = getCloudinary();
     let imageUrl: string;
-    const { error } = await supabase.storage.from('product-images').upload(fileName, buffer, {
-      contentType: file.type,
-      upsert: true,
-    });
 
-    if (error) {
-      console.warn('[image upload] Supabase storage error, using placeholder:', error.message);
-      imageUrl = `https://placehold.co/600x600/1a1a24/f97316?text=${encodeURIComponent(product.name)}`;
-    } else {
-      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-      imageUrl = urlData.publicUrl;
+    try {
+      const uploadResult = await cld.uploader.upload(base64File, {
+        folder: 'sneakerlocal/products',
+        resource_type: 'image',
+        public_id: `product-${id}-${Date.now()}`,
+      });
+      imageUrl = uploadResult.secure_url;
+    } catch (uploadErr: unknown) {
+      let msg = 'Upload gagal';
+      if (uploadErr && typeof uploadErr === 'object') {
+        const e = uploadErr as Record<string, unknown>;
+        if (e.error && typeof e.error === 'object') {
+          msg = (e.error as Record<string, unknown>).message as string ?? msg;
+        } else if (typeof e.message === 'string') {
+          msg = e.message;
+        } else {
+          msg = JSON.stringify(uploadErr);
+        }
+      } else if (uploadErr instanceof Error) {
+        msg = uploadErr.message;
+      }
+      console.error('[products/image POST] Cloudinary error:', JSON.stringify(uploadErr));
+      return NextResponse.json({ message: `Gagal mengunggah gambar: ${msg}` }, { status: 500 });
     }
 
     // If this is the primary image, unset any existing primary
@@ -63,7 +82,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
     }
 
-    // Determine if this should be primary (first image automatically becomes primary)
+    // First image automatically becomes primary
     const existingCount = await prisma.productImage.count({ where: { productId: id } });
     const shouldBePrimary = isPrimary || existingCount === 0;
 
@@ -80,10 +99,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 /**
  * DELETE /api/products/[id]/image?imageId=xxx
- * Remove a specific product image.
+ * Remove a specific product image record from DB.
+ * Note: Cloudinary file is NOT deleted here to preserve CDN cache.
+ * Use Cloudinary dashboard to clean up unused assets.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const authResult = await requireAdmin(req);
+  const authResult = await requireAdminOrStaff(req);
   if (isErrorResponse(authResult)) return authResult;
 
   try {
