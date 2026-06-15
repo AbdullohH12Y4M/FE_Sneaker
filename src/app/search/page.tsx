@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { productsApi } from '@/lib/api';
@@ -10,7 +10,7 @@ import ProductCard from '@/components/shop/ProductCard';
 import { mockProducts } from '@/data/mockProducts';
 import styles from './page.module.css';
 
-export default function SearchPage() {
+function SearchContent() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,31 +34,19 @@ export default function SearchPage() {
       setIsFromMock(false);
 
       try {
-        const requestParams: Record<string, string | number> = { limit: 100 };
-        if (category) requestParams.categorySlug = category.toLowerCase();
-        if (color) requestParams.color = color;
-        if (size) requestParams.size = size;
-        if (minPrice) requestParams.minPrice = minPrice;
-        if (maxPrice) requestParams.maxPrice = maxPrice;
-        if (search) requestParams.q = search;
-
-        const res = await productsApi.getAll(requestParams);
+        // getAllPublic hits /api/products/all which returns full data with SKUs
+        // This is required for client-side filtering by color/size/stock
+        const res = await productsApi.getAllPublic();
         const raw = res.data;
-        const serverCategories: string[] =
-          raw && typeof raw === 'object' && !Array.isArray(raw) && Array.isArray((raw as { categories?: unknown[] }).categories)
-            ? ((raw as { categories: unknown[] }).categories as string[])
-            : [];
 
         const normalized = parseProductsList(raw).map((p) => ({ ...p, _mock: false }));
 
-        const categoriesNormalized =
-          serverCategories.length
-            ? serverCategories.map((c: unknown) =>
-                typeof c === 'string' ? c : ((c as { name?: string; slug?: string })?.name ?? (c as { slug?: string }).slug ?? null)
-              ).filter(Boolean)
-            : Array.from(new Set(normalized.map((p) => p.category).filter(Boolean)));
-
-        const uniqueCategories = Array.from(new Set(categoriesNormalized));
+        const uniqueCategories = Array.from(
+          new Set(normalized.map((p) => {
+            const cat = p.category;
+            return typeof cat === 'string' ? cat : (cat as any)?.name ?? null;
+          }).filter(Boolean))
+        ) as string[];
 
         if (!mounted) return;
         setProducts(normalized);
@@ -176,5 +164,17 @@ if (color && !availableSkus.some((sku: any) => String(sku.color ?? '').toLowerCa
         </div>
       </section>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="container" style={{ padding: '40px 0' }}>
+        <p className="text-muted">Memuat katalog...</p>
+      </div>
+    }>
+      <SearchContent />
+    </Suspense>
   );
 }

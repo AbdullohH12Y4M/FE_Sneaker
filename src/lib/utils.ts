@@ -85,6 +85,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   WAITING_CONFIRMATION: 'Menunggu Verifikasi Admin',
   PAID: 'Sudah Dibayar',
   SHIPPED: 'Dalam Pengiriman',
+  DELIVERED: 'Sudah Diterima',
   CANCELLED: 'Dibatalkan',
 };
 
@@ -93,6 +94,7 @@ export const ORDER_STATUS_COLORS: Record<string, string> = {
   WAITING_CONFIRMATION: 'badge-info',
   PAID: 'badge-info',
   SHIPPED: 'badge-primary',
+  DELIVERED: 'badge-success',
   CANCELLED: 'badge-danger',
 };
 

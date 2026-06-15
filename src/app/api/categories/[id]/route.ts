@@ -1,10 +1,22 @@
 import { NextRequest } from 'next/server';
 import { createHandler } from '@/server/utils/route-handler';
 import { CategoryService } from '@/server/services';
+import { CategoryRepository } from '@/server/repositories';
 
 export const GET = createHandler(async (req: NextRequest, ctx) => {
   const id = ctx.params.id;
-  const category = await CategoryService.getCategory(id);
+  // Try by ID first, then fall back to slug so both /categories/[id] and
+  // /categories/[slug] work without a separate route.
+  let category = await CategoryRepository.findById(id);
+  if (!category) {
+    category = await CategoryRepository.findBySlug(id);
+  }
+  if (!category) {
+    return new Response(
+      JSON.stringify({ success: false, message: 'Kategori tidak ditemukan' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
   return {
     message: 'Kategori berhasil diambil',
     data: category,

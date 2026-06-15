@@ -33,12 +33,14 @@ export default function CategoryDetailPage() {
     if (!categoryId) return;
     try {
       setLoading(true);
+      // categoriesApi.getOne handles both UUID and slug (API now supports both)
       const catRes = await categoriesApi.getOne(categoryId);
       const cat = catRes.data as Category;
       setCategory(cat);
 
-      const prodRes = await productsApi.getAll({
-        limit: 100,
+      // getAllPublic hits /api/products/all which returns data with SKUs + stock
+      // It now accepts optional ?categorySlug= filter
+      const prodRes = await productsApi.getAllPublic({
         categorySlug: cat.slug,
       });
       setProducts(parseProductsList(prodRes.data) as Product[]);

@@ -1,11 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/products/all — public, all active products WITH skus + brand + images
-export async function GET() {
+// Supports optional ?categorySlug= filter
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = req.nextUrl;
+    const categorySlug = searchParams.get('categorySlug') || undefined;
+    const q = searchParams.get('q') || undefined;
+
     const products = await prisma.product.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+        ...(q
+          ? {
+              OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { description: { contains: q, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         category: { select: { id: true, name: true, slug: true } },

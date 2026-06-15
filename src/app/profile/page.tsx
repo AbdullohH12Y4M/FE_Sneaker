@@ -132,7 +132,11 @@ export default function ProfilePage() {
             <p className="text-muted">{email}</p>
             <span
               className={`badge ${
-                session?.user?.role === 'ADMIN' ? 'badge-warning' : 'badge-info'
+                session?.user?.role === 'ADMIN'
+                  ? 'badge-warning'
+                  : session?.user?.role === 'STAFF'
+                  ? 'badge-info'
+                  : 'badge-primary'
               }`}
             >
               {session?.user?.role || 'CUSTOMER'}
