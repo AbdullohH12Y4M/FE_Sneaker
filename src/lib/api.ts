@@ -1,6 +1,37 @@
 import axios from 'axios';
 import { isMockApiEnabled } from './mock-api';
 import { mockHandlers } from './mock-api/handlers';
+import type { ApiResponse, PaginatedResponse } from '@/types';
+
+/**
+ * Safely unwrap the `data` field from our standard API envelope:
+ *   { success: true, message: "...", data: T }
+ *
+ * When a route uses `createHandler`, every response body is wrapped.
+ * Use this helper instead of `(res.data as any).data` to keep type safety.
+ *
+ * Falls back to `res.data` itself if `res.data.data` is undefined (e.g. raw
+ * routes that do NOT use createHandler, such as /api/products/all).
+ */
+export function unwrapApiData<T>(resData: unknown): T {
+  if (
+    resData !== null &&
+    typeof resData === 'object' &&
+    'data' in (resData as object)
+  ) {
+    const envelope = resData as ApiResponse<T>;
+    if (envelope.data !== undefined) return envelope.data;
+  }
+  return resData as T;
+}
+
+/**
+ * Unwrap a paginated response from createHandler:
+ *   { success, message, data: { items, total, page, limit, totalPages } }
+ */
+export function unwrapPaginated<T>(resData: unknown): PaginatedResponse<T> {
+  return unwrapApiData<PaginatedResponse<T>>(resData);
+}
 
 /**
  * Axios instance for all API calls.

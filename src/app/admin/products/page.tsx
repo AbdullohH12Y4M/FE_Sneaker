@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { productsApi, categoriesApi, brandsApi } from '@/lib/api';
+import { productsApi, categoriesApi, brandsApi, unwrapApiData } from '@/lib/api';
 import { parseProductsList } from '@/lib/api-helpers';
 import { formatPrice, extractErrorMessage } from '@/lib/utils';
 import type { Product, Category, Brand } from '@/types';
@@ -106,7 +106,7 @@ export default function AdminProductsPage() {
         isActive: productForm.isActive,
       });
 
-      const newId = (res?.data as { id?: string })?.id;
+      const newId = unwrapApiData<{ id?: string }>(res?.data)?.id;
 
       // Upload image if provided
       if (newId && productImageFile) {

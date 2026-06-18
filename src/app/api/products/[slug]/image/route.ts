@@ -23,10 +23,18 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { slug: id } = await params;
 
-    const product = await prisma.product.findUnique({ where: { id } });
+    const product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { id },
+          { slug: id }
+        ]
+      }
+    });
     if (!product) {
       return NextResponse.json({ message: 'Produk tidak ditemukan' }, { status: 404 });
     }
+    const resolvedProductId = product.id;
 
     const formData = await req.formData();
     const rawFile = formData.get('file') as File | null;
@@ -50,7 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     try {
       uploadResult = await uploadToCloudinary(buffer, file.type, {
         folder: 'sneakerlocal/products',
-        publicId: `product-${id}-${Date.now()}`,
+        publicId: `product-${resolvedProductId}-${Date.now()}`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload gagal';
@@ -61,17 +69,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     // If this is the primary image, unset any existing primary
     if (isPrimary) {
       await prisma.productImage.updateMany({
-        where: { productId: id, isPrimary: true },
+        where: { productId: resolvedProductId, isPrimary: true },
         data: { isPrimary: false },
       });
     }
 
     // First image automatically becomes primary
-    const existingCount = await prisma.productImage.count({ where: { productId: id } });
+    const existingCount = await prisma.productImage.count({ where: { productId: resolvedProductId } });
     const shouldBePrimary = isPrimary || existingCount === 0;
 
     const productImage = await prisma.productImage.create({
-      data: { productId: id, url: uploadResult.secureUrl, isPrimary: shouldBePrimary },
+      data: { productId: resolvedProductId, url: uploadResult.secureUrl, isPrimary: shouldBePrimary },
     });
 
     return NextResponse.json({ imageUrl: uploadResult.secureUrl, productImage });
@@ -94,15 +102,30 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (isErrorResponse(authResult)) return authResult;
 
   try {
-    const { slug: productId } = await params;
+    const { slug: id } = await params;
     const imageId = req.nextUrl.searchParams.get('imageId');
 
     if (!imageId) {
       return NextResponse.json({ message: 'imageId wajib diisi' }, { status: 400 });
     }
 
+    const product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { id },
+          { slug: id }
+        ]
+      },
+      select: { id: true }
+    });
+
+    if (!product) {
+      return NextResponse.json({ message: 'Produk tidak ditemukan' }, { status: 404 });
+    }
+    const resolvedProductId = product.id;
+
     const image = await prisma.productImage.findFirst({
-      where: { id: imageId, productId },
+      where: { id: imageId, productId: resolvedProductId },
     });
 
     if (!image) {

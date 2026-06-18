@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { productsApi, categoriesApi, brandsApi } from '@/lib/api';
+import { productsApi, categoriesApi, brandsApi, unwrapApiData } from '@/lib/api';
 import { extractErrorMessage, formatPrice } from '@/lib/utils';
 
 import type { Product, ProductImage, ProductSKU, Category, Brand } from '@/types';
@@ -66,7 +66,9 @@ export default function AdminProductEditPage() {
       ]);
 
       // normalize product from API response
-      const raw = prodRes.data as Record<string, unknown>;
+      // productsApi.getById uses createHandler → response is wrapped as { success, message, data: {...} }
+      // unwrapApiData safely extracts .data if it exists, otherwise falls back to the payload itself.
+      const raw = unwrapApiData<Record<string, unknown>>(prodRes.data);
       const found: Product = {
         id: String(raw.id ?? ''),
         name: String(raw.name ?? ''),
@@ -122,11 +124,21 @@ export default function AdminProductEditPage() {
       setFormData(initial);
       setOriginalFormData(initial);
 
-      const catData = catRes.data as { items?: Category[] } | Category[];
-      setCategories(Array.isArray(catData) ? catData : (catData as { items?: Category[] }).items ?? []);
+      // categories/all → { items: [...] } (no createHandler wrapper)
+      const catPayload = catRes.data as { items?: Category[] } | Category[];
+      setCategories(
+        Array.isArray(catPayload)
+          ? catPayload
+          : (catPayload as { items?: Category[] }).items ?? []
+      );
 
-      const brandData = brandRes.data as { items?: Brand[] } | Brand[];
-      setBrands(Array.isArray(brandData) ? brandData : (brandData as { items?: Brand[] }).items ?? []);
+      // brands GET → { items: [...] } (no createHandler wrapper)
+      const brandPayload = brandRes.data as { items?: Brand[] } | Brand[];
+      setBrands(
+        Array.isArray(brandPayload)
+          ? brandPayload
+          : (brandPayload as { items?: Brand[] }).items ?? []
+      );
 
       setError('');
     } catch (err: unknown) {
