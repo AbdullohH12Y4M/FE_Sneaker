@@ -53,12 +53,12 @@
   --radius-xl: 24px;
   --radius-full: 9999px;
 
-  /* Shadows (Soft & Subtle for high luxury finish) */
-  --shadow-sm: 0 2px 8px rgba(44, 26, 14, 0.04);
-  --shadow-md: 0 8px 24px rgba(44, 26, 14, 0.06);
-  --shadow-lg: 0 16px 40px rgba(44, 26, 14, 0.09);
-  --shadow-glow: 0 10px 30px rgba(245, 158, 11, 0.12);
-  --shadow-glow-accent: 0 10px 30px rgba(245, 158, 11, 0.18);
+  /* Shadows (Removed for fast rendering) */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-glow: none;
+  --shadow-glow-accent: none;
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -169,14 +169,14 @@ input, textarea, select {
 .btn-primary {
   background: var(--color-accent);
   color: #ffffff;
-  box-shadow: 0 6px 18px var(--color-accent-glow);
+  border: 1px solid var(--color-accent);
 }
 
 
 .btn-primary:hover {
   background: var(--color-accent-hover);
   color: #ffffff;
-  box-shadow: 0 6px 20px var(--color-accent-glow);
+  border-color: var(--color-accent-hover);
   transform: translateY(-1px);
 }
 
@@ -258,7 +258,7 @@ input, textarea, select {
 .form-input::placeholder { color: var(--color-text-faint); }
 .form-input:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-dim);
+  outline: 2px solid var(--color-accent);
 }
 .form-input:disabled {
   opacity: 0.5;
@@ -282,7 +282,7 @@ input, textarea, select {
 }
 .form-select:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-dim);
+  outline: 2px solid var(--color-accent);
 }
 
 .form-textarea {

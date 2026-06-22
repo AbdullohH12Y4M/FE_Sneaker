@@ -61,3 +61,23 @@
     grid-template-columns: 1fr;
   }
 }
+
+.dividerRow {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 16px 0 8px;
+}
+
+.dividerRow::before,
+.dividerRow::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dividerText {
+  padding: 0 10px;
+  color: var(--color-text-faint);
+  font-size: 0.85rem;
+}

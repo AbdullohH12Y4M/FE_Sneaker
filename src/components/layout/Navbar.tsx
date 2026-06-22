@@ -128,21 +128,25 @@ export default function Navbar() {
           <nav className={styles.desktopNav}>
             {/* Home link */}
             <Link
-              href={HOME_LINK.href}
-              className={`${styles.navLink} ${isLinkActive(HOME_LINK.href) ? styles.navLinkActive : ''}`}
+              href="/"
+              className={`${styles.navLink} ${isLinkActive('/') ? styles.navLinkActive : ''}`}
             >
-              {HOME_LINK.label}
+              Beranda
             </Link>
-            {/* Dynamic category links */}
-            {navCategories.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`${styles.navLink} ${isLinkActive(link.href) ? styles.navLinkActive : ''}`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {/* Search link */}
+            <Link
+              href="/search"
+              className={`${styles.navLink} ${isLinkActive('/search') ? styles.navLinkActive : ''}`}
+            >
+              Cari
+            </Link>
+            {/* Setting link */}
+            <Link
+              href="/profile"
+              className={`${styles.navLink} ${isLinkActive('/profile') ? styles.navLinkActive : ''}`}
+            >
+              Pengaturan
+            </Link>
           </nav>
 
           {/* Actions */}
@@ -319,15 +323,17 @@ export default function Navbar() {
           >
             <div className={styles.mobileLinks}>
               {/* Home link */}
-              <Link href={HOME_LINK.href} className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
-                {HOME_LINK.label}
+              <Link href="/" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                Beranda
               </Link>
-              {/* Dynamic category links */}
-              {navCategories.map((link) => (
-                <Link key={link.href} href={link.href} className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
-                  {link.label}
-                </Link>
-              ))}
+              {/* Search link */}
+              <Link href="/search" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                Cari
+              </Link>
+              {/* Setting link */}
+              <Link href="/profile" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
+                Pengaturan
+              </Link>
               {session ? (
                 <>
                   <hr className="divider" />

@@ -4,11 +4,10 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  transition: border-color var(--transition-base);
 }
 .card:hover {
   border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-lg);
 }
 .outOfStock { opacity: 0.6; }
 
@@ -52,7 +51,6 @@
   font-weight: 700;
   padding: 3px 10px;
   border-radius: var(--radius-full);
-  box-shadow: 0 2px 8px var(--color-accent-dim);
   z-index: 2;
 }
 
