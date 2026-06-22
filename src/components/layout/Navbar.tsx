@@ -114,6 +114,9 @@ export default function Navbar() {
 
   return (
     <header className={`${styles.navbar} ${scrolled ? styles.scrolled : ''}`}>
+      <div className={styles.announcementBar}>
+        🚀 Gratis Ongkir Area Malang Raya — Lowokwaru, Klojen, Blimbing, Sukun, Kedungkandang
+      </div>
       <div className="container">
         <div className={styles.inner}>
           {/* Logo */}
@@ -138,7 +141,7 @@ export default function Navbar() {
               href="/search"
               className={`${styles.navLink} ${isLinkActive('/search') ? styles.navLinkActive : ''}`}
             >
-              Cari
+              Produk
             </Link>
             {/* Setting link */}
             <Link
@@ -326,9 +329,9 @@ export default function Navbar() {
               <Link href="/" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
                 Beranda
               </Link>
-              {/* Search link */}
+              {/* Search/Produk link */}
               <Link href="/search" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
-                Cari
+                Produk
               </Link>
               {/* Setting link */}
               <Link href="/profile" className={styles.mobileLink} onClick={() => setMobileOpen(false)}>
